@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. INICIALIZACIÓN ABSOLUTA DEL ESTADO DE LA SESIÓN
+# 1. INICIALIZACIÓN DE VARIABLES GLOBALES EN SESIÓN
 if "equipos" not in st.session_state:
     st.session_state["equipos"] = []
 if "materiales" not in st.session_state:
@@ -10,14 +10,13 @@ if "materiales" not in st.session_state:
 if "servicios_mo" not in st.session_state:
     st.session_state["servicios_mo"] = []
 
-# Configuración de la página y diseño visual
+# Configuración de página e interfaz
 st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="wide")
 
-# Título y Encabezado Corporativo
 st.title("🛡️ Sistema de Cotizaciones Automáticas — Alfa Security")
 st.markdown("---")
 
-# 2. INFORMACIÓN DEL PROYECTO (Panel Izquierdo)
+# 2. PANEL IZQUIERDO: DATOS DEL PROYECTO
 st.sidebar.header("📋 Datos del Proyecto")
 proyecto = st.sidebar.text_input("Nombre del Proyecto", "Proyecto Procaps El Salvador")
 empresa = st.sidebar.text_input("Empresa", "Alfa Security")
@@ -25,7 +24,7 @@ atencion = st.sidebar.text_input("Atención a:", "Ing. Miguel Melendez")
 validez = st.sidebar.text_input("Validez de la Oferta", "15 Días")
 pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraentrega")
 
-# PESTAÑAS PRINCIPALES DE LA INTERFAZ
+# Creación limpia de las 4 pestañas
 tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
     "🔍 Buscador Freund (Materiales)", 
@@ -33,7 +32,9 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Resumen Comercial"
 ])
 
+# ==========================================
 # --- PESTAÑA 1: EQUIPOS PRINCIPALES ---
+# ==========================================
 with tab1:
     st.subheader("Componentes y Equipos de Seguridad Electrónica")
     st.info("Ingresa los equipos principales. Podrás ajustar la rentabilidad directamente en la tabla de abajo.")
@@ -107,7 +108,9 @@ with tab1:
             st.session_state["equipos"] = []
             st.rerun()
 
+# ==========================================
 # --- PESTAÑA 2: BUSCADOR FREUND ---
+# ==========================================
 with tab2:
     st.subheader("Conexión de Catálogo (Ferretería Freund)")
     buscar_termino = st.text_input("¿Qué material o SKU necesitas buscar?", placeholder="Ej. tuberia emt")
@@ -141,7 +144,9 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
+# ==========================================
 # --- PESTAÑA 3: MANO DE OBRA ---
+# ==========================================
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
     st.info("Configura los costos operativos globales. Al presionar 'Agregar al Balance', el servicio se sumará a la tabla interactiva inferior.")
@@ -224,7 +229,7 @@ with tab3:
                         guardado = True
                 
                 if guardado:
-                    st.success("¡Servicios inyectados a la tabla de balance exitosamente!")
+                    st.success("¡Servicios inyectados exitosamente!")
                     st.rerun()
                 else:
                     st.warning("No ingresaste cantidades válidas mayores a cero.")
@@ -250,7 +255,6 @@ with tab3:
                 st.success("Herramienta agregada a la tabla de balance.")
                 st.rerun()
 
-    # --- TABLA INTERACTIVA DE BALANCE DE COSTOS ---
     st.markdown("---")
     st.markdown("### 📊 Balance del Costo de Operación de Mano de Obra")
     
@@ -300,12 +304,14 @@ with tab3:
         
         st.markdown(" ")
         cb1, cb2 = st.columns(2)
-        cb1.metric("A MÍ ME CUESTA TOTAL (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
-        cb2.metric("AL CLIENTE LE CUESTA TOTAL (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
+        cb1.metric("Costo Interno Total (Mano de Obra)", f"${gran_costo_interno_mo:,.2f}")
+        cb2.metric("Precio de Venta Total (Cliente)", f"${gran_precio_cliente_mo:,.2f}")
     else:
-        st.warning("No hay registros en la tabla de balance de operación.")
+        st.info("No hay registros en la tabla de balance de operación.")
 
-# --- PESTAÑA 4: RESUMEN COMERCIAL (ACTUALIZADA) ---
+# ==========================================
+# --- PESTAÑA 4: RESUMEN COMERCIAL ---
+# ==========================================
 with tab4:
     st.subheader("📊 Resumen General Comercial")
     
@@ -313,7 +319,7 @@ with tab4:
     lista_mat = st.session_state.get("materiales", [])
     lista_mo = st.session_state.get("servicios_mo", [])
     
-    # 1. CÁLCULO DE COSTOS Y VENTAS POR SECCIÓN
+    # Costos y ventas cruzadas por sección
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     utilidad_equipos = venta_equipos - costo_equipos
@@ -326,25 +332,23 @@ with tab4:
     venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
     utilidad_mo = venta_mo_tot - costo_mo_tot
     
-    # Consolidados totales del proyecto
+    # Consolidados finales del proyecto
     costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
     subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
     utilidad_total = subtotal_venta_proyecto - costo_total_proyecto
     
-    # Cálculo de la Rentabilidad Real (Basada en Margen sobre Precio de Venta)
     rentabilidad_real_pct = (utilidad_total / subtotal_venta_proyecto * 100) if subtotal_venta_proyecto > 0 else 0.0
     
     iva_calc = subtotal_venta_proyecto * 0.13
     total_general_cliente = subtotal_venta_proyecto + iva_calc
     
-    # INTERFAZ: RENTABILIDAD OBJETIVO VS REAL
+    # KPI de Rentabilidades Objetivo vs Real
     st.markdown("#### 🎯 Análisis de Rentabilidad y Objetivos")
     col_rent1, col_rent2, col_rent3 = st.columns(3)
     
     rent_objetivo = col_rent1.number_input("Fijar Rentabilidad Objetivo (%)", min_value=0.0, max_value=100.0, value=30.0, step=1.0)
     col_rent2.metric("Rentabilidad Real del Proyecto", f"{rentabilidad_real_pct:.2f}%")
     
-    # Indicador de cumplimiento de meta
     if rentabilidad_real_pct >= rent_objetivo:
         col_rent3.success("✅ ¡Meta de rentabilidad alcanzada o superada!")
     else:
@@ -352,7 +356,6 @@ with tab4:
         
     st.markdown("---")
     
-    # PANEL VISUAL: TABLA DE CARA AL CLIENTE Y GRÁFICO DE TORTA EN PARALELO
     col_izq_res, col_der_res = st.columns([4, 3])
     
     with col_izq_res:
@@ -390,26 +393,22 @@ with tab4:
     with col_der_res:
         st.markdown("#### 📊 Distribución de la Utilidad Retenida")
         
-        # Validación de datos para el gráfico
         if utilidad_total > 0:
             data_grafico = {
                 "Sección": ["Equipos Principales", "Materiales e Insumos", "Mano de Obra y Logística"],
-                "Utilidad ($)": [max(0.0, utilidad_equipos), max(0.0, utilidad_materiales), max(0.0, utilidad_mo)],
-                "Venta Total ($)": [venta_equipos, venta_materiales, venta_mo_tot]
+                "Utilidad ($)": [max(0.0, utilidad_equipos), max(0.0, utilidad_materiales), max(0.0, utilidad_mo)]
             }
             df_grafico = pd.DataFrame(data_grafico)
             
-            # Generación del gráfico de pie dinámico con Plotley
+            # Generación limpia del gráfico circular corregido sin parámetros depreciados
             fig = px.pie(
                 df_grafico, 
                 values="Utilidad ($)", 
                 names="Sección",
-                title="¿Qué sección genera más rentabilidad? (Monto en $ de Utilidad)",
                 hole=0.3,
-                hover_data=["Venta Total ($)"],
-                labels={"Utilidad ($)": "Utilidad"}
+                title="Aporte de Utilidad por Sección"
             )
-            fig.update_traces(textposition='inside', textinfo='percent+value', labelssource="Sección")
+            fig.update_traces(textposition='inside', textinfo='percent+value')
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Agrega equipos o servicios con rentabilidad en las pestañas anteriores para proyectar el gráfico de pastel.")
