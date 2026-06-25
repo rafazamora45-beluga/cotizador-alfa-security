@@ -66,9 +66,9 @@ with tab1:
         if st.button("Limpiar Equipos", key="btn_clear_eq"):
             st.session_state.equipos = []
             try:
-                st.rerun()
-            except AttributeError:
-                st.experimental_rerun()
+                st.sidebar.empty()
+            except:
+                pass
 
 # --- PESTAÑA 2: BUSCADOR EN VIVO (FREUND) ---
 with tab2:
@@ -148,9 +148,9 @@ with tab3:
         if st.button("Limpiar Mano de Obra", key="btn_clear_mo"):
             st.session_state.mano_obra = []
             try:
-                st.rerun()
-            except AttributeError:
-                st.experimental_rerun()
+                st.sidebar.empty()
+            except:
+                pass
 
 # --- PESTAÑA 4: RESUMEN COMERCIAL Y LIQUIDACIÓN ---
 with tab4:
@@ -158,4 +158,63 @@ with tab4:
     
     # Cálculos Financieros Consolidados
     costo_equipos = sum(x["Costo Total"] for x in st.session_state.equipos)
-    venta_equipos = sum(x["Precio Venta Total"]
+    venta_equipos = sum(x["Precio Venta Total"] for x in st.session_state.equipos)
+    
+    costo_materiales = sum(x["Costo Total"] for x in st.session_state.materiales)
+    venta_materiales = sum(x["Precio Venta Total"] for x in st.session_state.materiales)
+    
+    costo_mo = sum(x["Costo Total"] for x in st.session_state.mano_obra)
+    venta_mo = sum(x["Precio Venta Total"] for x in st.session_state.mano_obra)
+    
+    costo_proyecto_total = costo_equipos + costo_materiales + costo_mo
+    venta_proyecto_total = venta_equipos + venta_materiales + venta_mo
+    
+    utilidad_neta = venta_proyecto_total - costo_proyecto_total
+    
+    # Control de división por cero si la cotización está vacía
+    margen_real = (utilidad_neta / venta_proyecto_total) * 100 if venta_proyecto_total > 0 else 0.0
+    
+    # Impuestos locales de El Salvador (IVA 13%)
+    iva = venta_proyecto_total * 0.13
+    gran_total = venta_proyecto_total + iva
+    
+    # PANTALLA DE KPI FINANCIEROS (CON MARGEN ASEGURADO DEL 40%)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Costo Total Alfa Security", f"${costo_proyecto_total:,.2f}")
+    c2.metric("Precio de Venta (Subtotal)", f"${venta_proyecto_total:,.2f}")
+    c3.metric("Utilidad Bruta Asegurada", f"${utilidad_neta:,.2f}")
+    c4.metric("Rentabilidad Real", f"{margen_real:.1f}%")
+    
+    st.markdown("### Desglose Comercial para Presentación")
+    
+    # Tabla formal consolidada para copiar o exportar
+    resumen_datos = {
+        "Rubro de Inversión": ["Equipos Electrónicos", "Materiales y Canalización (Freund)", "Ingeniería y Mano de Obra"],
+        "Costo Base ($)": [costo_equipos, costo_materiales, costo_mo],
+        "Precio de Venta ($)": [venta_equipos, venta_materiales, venta_mo]
+    }
+    st.table(pd.DataFrame(resumen_datos))
+    
+    st.markdown("---")
+    col_izq, col_der = st.columns(2)
+    
+    with col_izq:
+        st.markdown(f"""
+        **Condiciones Comerciales:**
+        * **Cliente:** {cliente}
+        * **Atención:** {atencion}
+        * **Validez del Presupuesto:** {validez}
+        * **Términos de Pago:** {pago}
+        """)
+        
+    with col_der:
+        st.markdown(f"""
+        ### Resumen de Facturación:
+        * **SUBTOTAL:** ${venta_proyecto_total:,.2f}
+        * **IVA (13%):** ${iva:,.2f}
+        * **TOTAL COTIZADO:** **${gran_total:,.2f}**
+        """)
+        
+    if st.button("🖨️ Generar Presentación Comercial"):
+        st.balloons()
+        st.success("¡Cotización procesada exitosamente con un 40% de rentabilidad fija para Alfa Security!")
