@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from fpdf import FPDF
-import io
 
 # 1. INICIALIZACIÓN DE VARIABLES GLOBALES EN SESIÓN
 if "equipos" not in st.session_state:
@@ -26,7 +25,7 @@ atencion = st.sidebar.text_input("Atención a:", "Ing. Miguel Melendez")
 validez = st.sidebar.text_input("Validez de la Oferta", "15 Días")
 pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraentrega")
 
-# Creación limpia de las 4 pestañas
+# Creación limpia de las pestaña
 tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
     "🔍 Buscador Freund (Materiales)", 
@@ -159,8 +158,7 @@ with tab2:
 # ==========================================
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
-    st.info("Configura los costos operativos globales. Al presionar 'Agregar al Balance', el servicio se sumará a la tabla interactiva inferior.")
-
+    
     col_izq, col_der = st.columns([1, 1])
 
     with col_izq:
@@ -241,8 +239,6 @@ with tab3:
                 if guardado:
                     st.success("¡Servicios inyectados exitosamente!")
                     st.rerun()
-                else:
-                    st.warning("No ingresaste cantidades válidas mayores a cero.")
 
     with col_der:
         st.markdown("#### 🔧 2. Certificaciones y Herramientas Especiales")
@@ -329,7 +325,6 @@ with tab4:
     lista_mat = st.session_state.get("materiales", [])
     lista_mo = st.session_state.get("servicios_mo", [])
     
-    # Costos y ventas cruzadas por sección
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     utilidad_equipos = venta_equipos - costo_equipos
@@ -342,33 +337,17 @@ with tab4:
     venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
     utilidad_mo = venta_mo_tot - costo_mo_tot
     
-    # Consolidados finales del proyecto
     costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
     subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
     utilidad_total = subtotal_venta_proyecto - costo_total_proyecto
     
     rentabilidad_real_pct = (utilidad_total / subtotal_venta_proyecto * 100) if subtotal_venta_proyecto > 0 else 0.0
     
-    # --- NUEVO: Checkbox interactivo para aplicar o no el IVA ---
     st.markdown("#### ⚙️ Impuestos")
     aplicar_iva = st.checkbox("Aplicar IVA (13%) a la oferta comercial", value=True)
     iva_calc = subtotal_venta_proyecto * 0.13 if aplicar_iva else 0.0
     total_general_cliente = subtotal_venta_proyecto + iva_calc
     
-    st.markdown("---")
-    
-    # KPI de Rentabilidades Objetivo vs Real
-    st.markdown("#### 🎯 Análisis de Rentabilidad y Objetivos")
-    col_rent1, col_rent2, col_rent3 = st.columns(3)
-    
-    rent_objetivo = col_rent1.number_input("Fijar Rentabilidad Objetivo (%)", min_value=0.0, max_value=100.0, value=30.0, step=1.0)
-    col_rent2.metric("Rentabilidad Real del Proyecto", f"{rentabilidad_real_pct:.2f}%")
-    
-    if rentabilidad_real_pct >= rent_objetivo:
-        col_rent3.success("✅ ¡Meta de rentabilidad alcanzada o superada!")
-    else:
-        col_rent3.warning("⚠️ La rentabilidad actual está por debajo del objetivo.")
-        
     st.markdown("---")
     
     col_izq_res, col_der_res = st.columns([4, 3])
@@ -382,135 +361,20 @@ with tab4:
         
         st.markdown(" ")
         st.markdown(f"#### 📄 Propuesta Comercial de cara al Cliente")
-        st.caption(f"**Proyecto:** {proyecto} | **Empresa:** {empresa} | **Atención:** {atencion}")
         
-        # Estructuración visual de las secciones agrupadas como se pidió
         tabla_final_items = []
-        
-        # 1. Equipos detallados uno por uno
         for eq in lista_eq:
             tabla_final_items.append({
                 "Descripción del Rubro": f"Equipo: {eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})",
                 "Monto ($)": eq["Precio Venta Total ($)"]
             })
             
-        # 2. Enunciado unificado para Mano de Obra
         if venta_mo_tot > 0:
             tabla_final_items.append({
                 "Descripción del Rubro": "Mano de Obra (Incluye servicios técnicos, logística, certificaciones y herramientas)",
                 "Monto ($)": venta_mo_tot
             })
             
-        # 3. Enunciado unificado para Materiales y Suministros
         if venta_materiales > 0:
             tabla_final_items.append({
                 "Descripción del Rubro": "Materiales y Suministros (Insumos de canalización y accesorios)",
-                "Monto ($)": venta_materiales
-            })
-        
-        if tabla_final_items:
-            st.table(pd.DataFrame(tabla_final_items))
-        else:
-            st.warning("No hay rubros cargados todavía en la cotización.")
-            
-        col_f1, col_f2 = st.columns(2)
-        col_f1.markdown(f"* **Términos de Pago:** {pago}\n* **Validez de Oferta:** {validez}")
-        col_f2.markdown(f"* **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}\n* **IVA (13%):** ${iva_calc:,.2f}\n* **TOTAL NETO:** **${total_general_cliente:,.2f}**")
-
-        # --- NUEVO: Motor de generación de PDF integrado ---
-        def generar_pdf():
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            
-            # Encabezado Alfa Security
-            pdf.set_font("Arial", "B", 16)
-            pdf.cell(200, 10, txt="ALFA SECURITY EL SALVADOR", ln=True, align="C")
-            pdf.set_font("Arial", "", 12)
-            pdf.cell(200, 10, txt="Oferta Económica Comercial", ln=True, align="C")
-            pdf.ln(10)
-            
-            # Metadatos del Proyecto
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(200, 8, txt="Datos Generales:", ln=True)
-            pdf.set_font("Arial", "", 11)
-            pdf.cell(200, 6, txt=f"Proyecto: {proyecto}", ln=True)
-            pdf.cell(200, 6, txt=f"Cliente / Empresa: {empresa}", ln=True)
-            pdf.cell(200, 6, txt=f"Atención a: {atencion}", ln=True)
-            pdf.cell(200, 6, txt=f"Validez de Oferta: {validez}", ln=True)
-            pdf.cell(200, 6, txt=f"Condiciones de Pago: {pago}", ln=True)
-            pdf.ln(8)
-            
-            # Tabla de Cotización
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(140, 8, txt="Descripción del Rubro / Componente", border=1)
-            pdf.cell(50, 8, txt="Total ($)", border=1, ln=True, align="R")
-            pdf.set_font("Arial", "", 10)
-            
-            # Detalle de Equipos Principales
-            if lista_eq:
-                pdf.set_font("Arial", "B", 10)
-                pdf.cell(190, 6, txt="--- EQUIPOS PRINCIPALES (DETALLADO) ---", border=1, ln=True)
-                pdf.set_font("Arial", "", 10)
-                for eq in lista_eq:
-                    txt_desc = f"{eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})"
-                    pdf.cell(140, 6, txt=txt_desc, border=1)
-                    pdf.cell(50, 6, txt=f"${eq['Precio Venta Total ($)']:.2f}", border=1, ln=True, align="R")
-            
-            # Bloque unificado de Mano de Obra
-            if venta_mo_tot > 0:
-                pdf.cell(140, 6, txt="Mano de Obra (Servicios técnicos, logística, certificaciones y herramientas)", border=1)
-                pdf.cell(50, 6, txt=f"${venta_mo_tot:.2f}", border=1, ln=True, align="R")
-                
-            # Bloque unificado de Materiales y Suministros
-            if venta_materiales > 0:
-                pdf.cell(140, 6, txt="Materiales y Suministros", border=1)
-                pdf.cell(50, 6, txt=f"${venta_materiales:.2f}", border=1, ln=True, align="R")
-                
-            pdf.ln(6)
-            
-            # Bloque de Cierre Económico
-            pdf.set_font("Arial", "B", 11)
-            pdf.cell(140, 6, txt="SUBTOTAL", align="R")
-            pdf.cell(50, 6, txt=f"${subtotal_venta_proyecto:.2f}", border=1, ln=True, align="R")
-            
-            pdf.cell(140, 6, txt="IVA (13%)" if aplicar_iva else "IVA (0%)", align="R")
-            pdf.cell(50, 6, txt=f"${iva_calc:.2f}", border=1, ln=True, align="R")
-            
-            pdf.cell(140, 6, txt="TOTAL NETO", align="R")
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(50, 6, txt=f"${total_general_cliente:.2f}", border=1, ln=True, align="R")
-            
-            return pdf.output(dest="S").encode("latin-1", errors="ignore")
-
-        # Botón de Descarga Física del PDF
-        pdf_bytes = generar_pdf()
-        st.markdown(" ")
-        st.download_button(
-            label="📥 Descargar Cotización en PDF",
-            data=pdf_bytes,
-            file_name=f"Cotizacion_{proyecto.replace(' ', '_')}.pdf",
-            mime="application/pdf"
-        )
-
-    with col_der_res:
-        st.markdown("#### 📊 Distribución de la Utilidad Retenida")
-        
-        if utilidad_total > 0:
-            data_grafico = {
-                "Sección": ["Equipos Principales", "Materiales e Insumos", "Mano de Obra y Logística"],
-                "Utilidad ($)": [max(0.0, utilidad_equipos), max(0.0, utilidad_materiales), max(0.0, utilidad_mo)]
-            }
-            df_grafico = pd.DataFrame(data_grafico)
-            
-            fig = px.pie(
-                df_grafico, 
-                values="Utilidad ($)", 
-                names="Sección",
-                hole=0.3,
-                title="Aporte de Utilidad por Sección"
-            )
-            fig.update_traces(textposition='inside', textinfo='percent+value')
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Agrega equipos o servicios con rentabilidad en las pestañas anteriores para proyectar el gráfico de pastel.")
