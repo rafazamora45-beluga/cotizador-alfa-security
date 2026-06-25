@@ -297,4 +297,204 @@ with tab3:
         
         col_mo_b1, col_mo_b2 = st.columns([3, 10])
         if col_mo_b1.button("🗑️ Eliminar Servicios Seleccionados", key="del_mo_sel"):
-            st.session_state["servicios_mo"] =
+            st.session_state["servicios_mo"] = [s for s in st.session_state["servicios_mo"] if not s["Borrar"]]
+            st.success("Items operativos eliminados.")
+            st.rerun()
+            
+        if col_mo_b2.button("Limpiar Tabla de Balance Completa", key="clear_mo_all"):
+            st.session_state["servicios_mo"] = []
+            st.rerun()
+            
+        gran_costo_interno_mo = sum(x["Costo Interno ($)"] for x in st.session_state["servicios_mo"])
+        gran_precio_cliente_mo = sum(x["Precio Venta Total ($)"] for x in st.session_state["servicios_mo"])
+        
+        st.markdown(" ")
+        cb1, cb2 = st.columns(2)
+        cb1.metric("Costo Interno Total (Mano de Obra)", f"${gran_costo_interno_mo:,.2f}")
+        cb2.metric("Precio de Venta Total (Cliente)", f"${gran_precio_cliente_mo:,.2f}")
+    else:
+        st.info("No hay registros en la tabla de balance de operación.")
+
+# ==========================================
+# --- PESTAÑA 4: RESUMEN COMERCIAL ---
+# ==========================================
+with tab4:
+    st.subheader("📊 Resumen General Comercial")
+    
+    lista_eq = st.session_state.get("equipos", [])
+    lista_mat = st.session_state.get("materiales", [])
+    lista_mo = st.session_state.get("servicios_mo", [])
+    
+    costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
+    venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
+    utilidad_equipos = venta_equipos - costo_equipos
+    
+    costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
+    venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
+    utilidad_materiales = venta_materiales - costo_materiales
+    
+    costo_mo_tot = sum(x.get("Costo Interno ($)", 0.0) for x in lista_mo)
+    venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
+    utilidad_mo = venta_mo_tot - costo_mo_tot
+    
+    costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
+    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
+    utilidad_total = subtotal_venta_proyecto - costo_total_proyecto
+    
+    rentabilidad_real_pct = (utilidad_total / subtotal_venta_proyecto * 100) if subtotal_venta_proyecto > 0 else 0.0
+    
+    st.markdown("#### ⚙️ Impuestos")
+    aplicar_iva = st.checkbox("Aplicar IVA (13%) a la oferta comercial", value=True)
+    iva_calc = subtotal_venta_proyecto * 0.13 if aplicar_iva else 0.0
+    total_general_cliente = subtotal_venta_proyecto + iva_calc
+    
+    st.markdown("---")
+    
+    # --- ANÁLISIS DE RENTABILIDAD TARGET ---
+    st.markdown("#### 🎯 Análisis de Rentabilidad y Objetivos")
+    col_rent1, col_rent2, col_rent3 = st.columns(3)
+    
+    rent_objetivo = col_rent1.number_input("Fijar Rentabilidad Objetivo (%)", min_value=0.0, max_value=100.0, value=30.0, step=1.0)
+    col_rent2.metric("Rentabilidad Real del Proyecto", f"{rentabilidad_real_pct:.2f}%")
+    
+    if rentabilidad_real_pct >= rent_objetivo:
+        col_rent3.success("✅ ¡Meta de rentabilidad alcanzada o superada!")
+    else:
+        col_rent3.warning("⚠️ La rentabilidad actual está por debajo del objetivo.")
+        
+    st.markdown("---")
+    
+    col_izq_res, col_der_res = st.columns([4, 3])
+    
+    with col_izq_res:
+        st.markdown("#### 🔒 Panel Privado de Costos e Ingresos")
+        c_liq1, c_liq2, c_liq3 = st.columns(3)
+        c_liq1.metric("Costo Total Interno", f"${costo_total_proyecto:,.2f}")
+        c_liq2.metric("Precio Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
+        c_liq3.metric("Utilidad Total Retenida", f"${utilidad_total:,.2f}")
+        
+        st.markdown(" ")
+        st.markdown(f"#### 📄 Propuesta Comercial de cara al Cliente")
+        
+        tabla_final_items = []
+        for eq in lista_eq:
+            tabla_final_items.append({
+                "Descripción del Rubro": f"Equipo: {eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})",
+                "Monto ($)": eq["Precio Venta Total ($)"]
+            })
+            
+        if venta_mo_tot > 0:
+            tabla_final_items.append({
+                "Descripción del Rubro": "Mano de Obra (Incluye servicios técnicos, logística, certificaciones y herramientas)",
+                "Monto ($)": venta_mo_tot
+            })
+            
+        if venta_materiales > 0:
+            tabla_final_items.append({
+                "Descripción del Rubro": "Materiales y Suministros (Insumos de canalización y accesorios)",
+                "Monto ($)": venta_materiales
+            })
+        
+        if tabla_final_items:
+            st.table(pd.DataFrame(tabla_final_items))
+        else:
+            st.warning("No hay rubros cargados todavía en la cotización.")
+            
+        col_f1, col_f2 = st.columns(2)
+        col_f1.markdown(f"* **Términos de Pago:** {pago}\n* **Validez de Oferta:** {validez}")
+        col_f2.markdown(f"* **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}\n* **IVA (13%):** ${iva_calc:,.2f}\n* **TOTAL NETO:** **${total_general_cliente:,.2f}**")
+
+        # --- SECCIÓN DE GENERACIÓN DE PDF CORREGIDA PARA FPDF2 ---
+        def generar_pdf():
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Helvetica", size=12)
+            
+            # Título
+            pdf.set_font("Helvetica", "B", 16)
+            pdf.cell(190, 10, txt="ALFA SECURITY EL SALVADOR", ln=True, align="C")
+            pdf.set_font("Helvetica", "", 12)
+            pdf.cell(190, 10, txt="Oferta Económica Comercial", ln=True, align="C")
+            pdf.ln(10)
+            
+            # Datos Generales
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(190, 8, txt="Datos Generales:", ln=True)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(190, 6, txt=f"Proyecto: {proyecto}", ln=True)
+            pdf.cell(190, 6, txt=f"Cliente / Empresa: {empresa}", ln=True)
+            pdf.cell(190, 6, txt=f"Atención a: {atencion}", ln=True)
+            pdf.cell(190, 6, txt=f"Validez de Oferta: {validez}", ln=True)
+            pdf.cell(190, 6, txt=f"Condiciones de Pago: {pago}", ln=True)
+            pdf.ln(8)
+            
+            # Tabla Encabezados
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(140, 8, txt="Descripción del Rubro / Componente", border=1)
+            pdf.cell(50, 8, txt="Total ($)", border=1, ln=True, align="R")
+            
+            # 1. Equipos Principales Detallados
+            if lista_eq:
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(190, 6, txt="--- EQUIPOS PRINCIPALES ---", border=1, ln=True)
+                pdf.set_font("Helvetica", "", 10)
+                for eq in lista_eq:
+                    txt_desc = f"{eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})"
+                    pdf.cell(140, 6, txt=txt_desc, border=1)
+                    pdf.cell(50, 6, txt=f"${eq['Precio Venta Total ($)']:.2f}", border=1, ln=True, align="R")
+            
+            # 2. Bloque Mano de Obra
+            if venta_mo_tot > 0:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(140, 6, txt="Mano de Obra (Servicios técnicos, logística, certificaciones y herramientas)", border=1)
+                pdf.cell(50, 6, txt=f"${venta_mo_tot:.2f}", border=1, ln=True, align="R")
+                
+            # 3. Bloque Materiales y Suministros
+            if venta_materiales > 0:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(140, 6, txt="Materiales y Suministros", border=1)
+                pdf.cell(50, 6, txt=f"${venta_materiales:.2f}", border=1, ln=True, align="R")
+                
+            pdf.ln(6)
+            
+            # Cierre Totales
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(140, 6, txt="SUBTOTAL", align="R")
+            pdf.cell(50, 6, txt=f"${subtotal_venta_proyecto:.2f}", border=1, ln=True, align="R")
+            
+            pdf.cell(140, 6, txt="IVA (13%)" if aplicar_iva else "IVA (0%)", align="R")
+            pdf.cell(50, 6, txt=f"${iva_calc:.2f}", border=1, ln=True, align="R")
+            
+            pdf.cell(140, 6, txt="TOTAL NETO", align="R")
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(50, 6, txt=f"${total_general_cliente:.2f}", border=1, ln=True, align="R")
+            
+            # En fpdf2, llamar a output() sin parámetros devuelve directamente el bytearray
+            return pdf.output()
+
+        # Botón de Descarga
+        if tabla_final_items:
+            try:
+                pdf_bytes = generar_pdf()
+                st.download_button(
+                    label="📥 Descargar Cotización en PDF",
+                    data=bytes(pdf_bytes),  # fpdf2 ya genera bytes nativos
+                    file_name=f"Cotizacion_{proyecto.replace(' ', '_')}.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"Error generando el PDF: {e}")
+
+    with col_der_res:
+        st.markdown("#### 📊 Distribución de la Utilidad Retenida")
+        # Corrección para que Plotly no falle si la utilidad acumulada es 0 o vacía
+        if utilidad_total > 0:
+            data_grafico = {
+                "Sección": ["Equipos Principales", "Materiales e Insumos", "Mano de Obra"],
+                "Utilidad ($)": [max(0.0, utilidad_equipos), max(0.0, utilidad_materiales), max(0.0, utilidad_mo)]
+            }
+            df_grafico = pd.DataFrame(data_grafico)
+            fig = px.pie(df_grafico, values="Utilidad ($)", names="Sección", hole=0.3)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Agrega componentes con margen de ganancia para visualizar la gráfica de utilidades.")
