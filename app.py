@@ -1,8 +1,5 @@
 import streamlit as st
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-from fpdf import FPDF
 
 # 1. INICIALIZACIÓN ABSOLUTA DEL ESTADO DE LA SESIÓN
 if "equipos" not in st.session_state:
@@ -10,12 +7,20 @@ if "equipos" not in st.session_state:
 if "materiales" not in st.session_state:
     st.session_state["materiales"] = []
 
-# Inicialización segura del bloque consolidado de Mano de Obra
+# Inicialización segura del bloque de Mano de Obra
 if "mano_obra_bloque" not in st.session_state:
     st.session_state["mano_obra_bloque"] = {
         "Costo Interno": 0.0,
         "Rentabilidad Aplicada (%)": 20.0,
-        "Detalle": {}
+        "Detalle": {
+            "Servicio de Configuración Especializada": 0.0,
+            "Servicio de Técnico Instalador": 0.0,
+            "Logística de Estadía fuera de San Salvador": 0.0,
+            "Viáticos de Alimentación y Campo": 0.0,
+            "Soporte de Técnico Outsourcing": 0.0,
+            "Servicio Técnico Nocturno / Fin de Semana": 0.0,
+            "Movilización y Combustible del Proyecto": 0.0
+        }
     }
 
 # Configuración de la página y diseño visual
@@ -149,7 +154,7 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
-# --- PESTAÑA 3: MANO DE OBRA (FORMULARIO FIJO ORIGINAL CON KM EDITABLE) ---
+# --- PESTAÑA 3: MANO DE OBRA ---
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
     st.info("Configura los costos operativos globales. El bloque técnico calcula por defecto una rentabilidad del 20% editable.")
@@ -202,18 +207,17 @@ with tab3:
             btn_guardar_mo = st.form_submit_button("Guardar Bloque Operativo")
 
             if btn_guardar_mo:
-                c_conf_tot = cant_conf * dias_conf * tarifa_conf
-                c_inst_tot = cant_inst * dias_inst * tarifa_inst
-                c_est_tot = dias_estadia * costo_estadia
-                c_via_tot = dias_viaticos * costo_viaticos
-                c_out_tot = dias_out * costo_out
-                c_noc_tot = dias_noc * costo_noc
-                c_comb_tot = kms_proyecto * costo_por_km
+                c_conf_tot = float(cant_conf * dias_conf * tarifa_conf)
+                c_inst_tot = float(cant_inst * dias_inst * tarifa_inst)
+                c_est_tot = float(dias_estadia * costo_estadia)
+                c_via_tot = float(dias_viaticos * costo_viaticos)
+                c_out_tot = float(dias_out * costo_out)
+                c_noc_tot = float(dias_noc * costo_noc)
+                c_comb_tot = float(kms_proyecto * costo_por_km)
                 
                 costo_operativo_total = c_conf_tot + c_inst_tot + c_est_tot + c_via_tot + c_out_tot + c_noc_tot + c_comb_tot
                 
                 st.session_state["mano_obra_bloque"] = {
-                    "Costo Interno": operativo_total if 'costo_operativo_total' in locals() else 0.0,
                     "Costo Interno": costo_operativo_total,
                     "Rentabilidad Aplicada (%)": rent_mo,
                     "Detalle": {
@@ -255,7 +259,7 @@ with tab3:
                 st.session_state["materiales"] = [x for x in st.session_state["materiales"] if not x["Descripción"].startswith("[HERRAMIENTA]")]
                 st.rerun()
 
-    # Cálculo local de totales para la Pestaña 3
+    # Cálculo dinámico de totales para la pestaña
     mo_datos = st.session_state["mano_obra_bloque"]
     costo_interno_personal = mo_datos["Costo Interno"]
     rent_actual_pct = mo_datos["Rentabilidad Aplicada (%)"] / 100.0
@@ -271,7 +275,7 @@ with tab3:
     cb1.metric("A MÍ ME CUESTA (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
     cb2.metric("AL CLIENTE LE CUESTA (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
 
-# --- PESTAÑA 4: LIQUIDACIÓN COMERCIAL TOTAL Y DESGLOSE COMPLETO ---
+# --- PESTAÑA 4: RESUMEN COMERCIAL Y LIQUIDACIÓN ---
 with tab4:
     st.subheader("📊 Resumen General de Cotización y Liquidación")
     
@@ -279,82 +283,12 @@ with tab4:
     lista_mat = [x for x in st.session_state.get("materiales", []) if not x["Descripción"].startswith("[HERRAMIENTA]")]
     items_herramientas = [x for x in st.session_state.get("materiales", []) if x["Descripción"].startswith("[HERRAMIENTA]")]
     
-    # Consolidados básicos
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     
     costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
     
-    # Procesar e inyectar el desglose dinámico de servicios
+    # Procesamiento del desglose de servicios individuales
     mo_datos_global = st.session_state["mano_obra_bloque"]
     rent_mo_pct = mo_datos_global["Rentabilidad Aplicada (%)"] / 100.0
-    
-    desglose_servicios_filas = []
-    costo_mo_tot = 0.0
-    venta_mo_tot = 0.0
-    
-    # Desglosamos individualmente cada item del diccionario si su costo es mayor a 0
-    for nombre_servicio, costo_interno in mo_datos_global.get("Detalle", {}).items():
-        if costo_interno > 0:
-            precio_venta_servicio = costo_interno / (1 - rent_mo_pct) if rent_mo_pct < 1 else costo_interno
-            desglose_servicios_filas.append({
-                "Descripción del Rubro": nombre_servicio,
-                "Monto ($)": precio_venta_servicio
-            })
-            costo_mo_tot += costo_interno
-            venta_mo_tot += precio_venta_servicio
-            
-    # Sumar las herramientas especiales al bloque operativo de servicios
-    for herr in items_herramientas:
-        desglose_servicios_filas.append({
-            "Descripción del Rubro": herr["Descripción"],
-            "Monto ($)": herr["Precio Venta Total ($)"]
-        })
-        costo_mo_tot += herr["Costo Total ($)"]
-        venta_mo_tot += herr["Precio Venta Total ($)"]
-    
-    # Totales del proyecto completo
-    costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
-    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
-    
-    iva_calc = subtotal_venta_proyecto * 0.13
-    total_general_cliente = subtotal_venta_proyecto + iva_calc
-    
-    st.markdown("#### 🔒 Panel Privado Alfa Security")
-    c_liq1, c_liq2, c_liq3 = st.columns(3)
-    c_liq1.metric("Costo Total Operativo Interno", f"${costo_total_proyecto:,.2f}")
-    c_liq2.metric("Precio de Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
-    c_liq3.metric("Utilidad Total Retenida", f"${(subtotal_venta_proyecto - costo_total_proyecto):,.2f}")
-    
-    st.markdown("---")
-    st.markdown("#### 📄 Datos de cara al Cliente para la Propuesta")
-    st.write(f"**Proyecto:** {proyecto} | **Empresa:** {empresa} | **Atención:** {atencion}")
-    
-    # DESGLOSE TOTAL ADAPTADO EXACTAMENTE A TU DISEÑO SOLICITADO
-    tabla_final_items = []
-    
-    # Agregar Equipos
-    if venta_equipos > 0:
-        tabla_final_items.append({"Descripción del Rubro": "Suministro de Equipos de Seguridad", "Monto ($)": venta_equipos})
-    # Agregar Materiales
-    if venta_materiales > 0:
-        tabla_final_items.append({"Descripción del Rubro": "Materiales e Insumos de Canalización", "Monto ($)": venta_materiales})
-    # Agregar cada uno de los servicios desglosados de manera independiente
-    tabla_final_items.extend(desglose_servicios_filas)
-    
-    if tabla_final_items:
-        st.table(pd.DataFrame(tabla_final_items))
-    else:
-        st.warning("No hay rubros cargados todavía en la cotización.")
-    
-    col_f1, col_f2 = st.columns(2)
-    col_f1.markdown(f"""
-    * **Términos de Pago:** {pago}
-    * **Validez de Oferta:** {validez}
-    """)
-    col_f2.markdown(f"""
-    * **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}
-    * **IVA (13%):** ${iva_calc:,.2f}
-    * **TOTAL NETO:** **${total_general_cliente:,.2f}**
-    """)
