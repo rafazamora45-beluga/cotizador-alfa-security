@@ -1,4 +1,5 @@
-import streamlit as st
+
+      import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -9,22 +10,8 @@ if "equipos" not in st.session_state:
     st.session_state["equipos"] = []
 if "materiales" not in st.session_state:
     st.session_state["materiales"] = []
-
-# Inicialización segura de Mano de Obra para evitar NameError en cualquier pestaña
-if "mano_obra_bloque" not in st.session_state:
-    st.session_state["mano_obra_bloque"] = {
-        "Costo Interno": 0.0,
-        "Rentabilidad Aplicada (%)": 20.0,
-        "Detalle": {
-            "Configuradores": 0.0,
-            "Instaladores": 0.0,
-            "Estadía fuera de SS": 0.0,
-            "Viáticos": 0.0,
-            "Outsourcing": 0.0,
-            "Nocturno/Finde": 0.0,
-            "Combustible": 0.0
-        }
-    }
+if "mano_obra_items" not in st.session_state:
+    st.session_state["mano_obra_items"] = []
 
 # Configuración de la página y diseño visual
 st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="wide")
@@ -45,7 +32,7 @@ pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraen
 tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
     "🔍 Buscador Freund (Materiales)", 
-    "🛠️ Mano de Obra", 
+    "🛠️ Mano de Obra y Logística", 
     "📊 Resumen Comercial y Liquidación"
 ])
 
@@ -70,7 +57,7 @@ with tab1:
             st.session_state["equipos"].append({
                 "Borrar": False,
                 "Descripción": desc_eq,
-                "Cantidad": cant_eq,
+                "Cantidad": int(cant_eq),
                 "Costo Unitario ($)": float(costo_eq),
                 "Costo Total ($)": float(costo_eq * cant_eq),
                 "Rentabilidad (%)": float(rent_inicial),
@@ -114,9 +101,8 @@ with tab1:
         st.markdown(" ")
         col_btn1, col_btn2 = st.columns([3, 10])
         
-        if col_btn1.button("🗑️ Aplicar Eliminación de Marcados"):
-            equipos_restantes = [eq for eq in st.session_state["equipos"] if not eq["Borrar"]]
-            st.session_state["equipos"] = equipos_restantes
+        if col_btn1.button("🗑️ Aplicar Eliminación de Marcados", key="del_eq_btn"):
+            st.session_state["equipos"] = [eq for eq in st.session_state["equipos"] if not eq["Borrar"]]
             st.success("Actualizado correctamente.")
             st.rerun()
                 
@@ -158,151 +144,150 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
-# --- PESTAÑA 3: MANO DE OBRA Y COSTOS OPERATIVOS ---
+# --- PESTAÑA 3: MANO DE OBRA Y LOGÍSTICA (NUEVO MODELO DE COMPONENTES SEPARADOS) ---
 with tab3:
-    st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
-    st.info("Configura los costos operativos. El bloque técnico calcula por defecto una rentabilidad del 20% editable.")
+    st.subheader("🛠️ Presupuesto Dinámico de Mano de Obra, Viáticos y Logística")
+    st.info("Agrega los rubros uno por uno. Podrás modificar la rentabilidad, días o costos directamente en la tabla.")
 
-    col_izq, col_der = st.columns([1, 1])
+    # Formulario dinámico de ingreso por ítem
+    with st.form("form_registro_mo"):
+        col_tipo, col_cant, col_dias, col_costo, col_rent = st.columns([3, 1, 1, 1, 1])
+        
+        tipo_item = col_tipo.selectbox("Tipo de Rubro Operativo", [
+            "Configurador", 
+            "Técnico Instalador", 
+            "Estadía fuera de SS", 
+            "Viáticos", 
+            "Técnico Outsourcing", 
+            "Técnico Nocturno / Fin de Semana",
+            "Combustible (Movilización)",
+            "Certificaciones y Herramientas Especiales"
+        ])
+        
+        cant = col_cant.number_input("Cantidad / Personal", min_value=1, value=1)
+        dias = col_dias.number_input("Días / Unidades", min_value=1, value=1)
+        
+        # Costos sugeridos adaptativos
+        costo_def = 25.0
+        if "Configurador" in tipo_item: costo_def = 50.0
+        elif "Combustible" in tipo_item: costo_def = 0.36  # CORREGIDO: Costo de KM totalmente editable de entrada
+        elif "Certificaciones" in tipo_item: costo_def = 100.0
+        
+        costo_u = col_costo.number_input("Costo Unitario ($)", min_value=0.0, value=costo_def, step=1.0)
+        
+        # Rentabilidad sugerida (20% para técnicos, 0% para herramientas directas)
+        rent_def = 0.0 if "Certificaciones" in tipo_item else 20.0
+        rent_u = col_rent.number_input("Rentabilidad (%)", min_value=0.0, max_value=99.0, value=rent_def, step=5.0)
+        
+        btn_add_mo = st.form_submit_button("⚡ Agregar Rubro Operativo")
+        
+        if btn_add_mo:
+            # Para combustible o viáticos globales, multiplicamos cantidad * unidades * costo unitario
+            costo_total_i = cant * dias * costo_u
+            m_dec = rent_u / 100.0
+            precio_v_u = (costo_u * dias) / (1 - m_dec) if m_dec < 1 else (costo_u * dias)
+            
+            # Si es herramienta va sin margen
+            if "Certificaciones" in tipo_item:
+                precio_v_u = costo_u * dias
+                rent_u = 0.0
 
-    with col_izq:
-        st.markdown("#### ⚙️ 1. Personal Técnico y Logística")
-        rent_mo = st.number_input("Rentabilidad Comercial del Bloque (%)", min_value=0.0, max_value=99.0, value=20.0, step=5.0, key="rent_mo_p3")
-        margen_mo_dec = rent_mo / 100.0
+            st.session_state["mano_obra_items"].append({
+                "Borrar": False,
+                "Rubro": tipo_item,
+                "Cantidad (Pers)": int(cant),
+                "Días / Factor": int(dias),
+                "Costo Base Unitario ($)": float(costo_u),
+                "Costo Total Interno ($)": float(costo_total_i),
+                "Rentabilidad (%)": float(rent_u),
+                "Precio Venta Total ($)": float(precio_v_u * cant)
+            })
+            st.success(f"Agregado de forma independiente: {tipo_item}")
 
-        with st.form("form_mano_obra_completo"):
-            st.markdown("**Carga de Personal:**")
-            c1, c2 = st.columns(2)
-            cant_conf = c1.number_input("Cantidad Configuradores", min_value=0, value=0)
-            dias_conf = c2.number_input("Días Configurador", min_value=0, value=0)
-            tarifa_conf = st.number_input("Costo Diario Configurador ($)", min_value=0.0, value=50.0)
+    # Tabla Interactiva de Mano de Obra
+    if st.session_state["mano_obra_items"]:
+        st.markdown("#### 📊 Tabla de Distribución de Mano de Obra")
+        st.caption("Puedes cambiar los costos, la cantidad de días o la rentabilidad celda por celda directamente en la cuadrícula.")
+        
+        df_mo_orig = pd.DataFrame(st.session_state["mano_obra_items"])
+        
+        df_mo_editado = st.data_editor(
+            df_mo_orig,
+            hide_index=True,
+            use_container_width=True,
+            disabled=["Rubro", "Costo Total Interno ($)", "Precio Venta Total ($)"],
+            column_config={
+                "Borrar": st.column_config.CheckboxColumn("Borrar", default=False),
+                "Cantidad (Pers)": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                "Días / Factor": st.column_config.NumberColumn("Días / Cant. KM", min_value=1, step=1),
+                "Costo Base Unitario ($)": st.column_config.NumberColumn("Costo Unitario ($)", format="$%.2f"),
+                "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99),
+                "Costo Total Interno ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Precio Venta Total ($)": st.column_config.NumberColumn(format="$%.2f")
+            }
+        )
+        
+        # Recálculo de fórmulas dinámicas sobre la marcha de la tabla de MO
+        for i in range(len(df_mo_editado)):
+            c_pers = df_mo_editado.at[i, "Cantidad (Pers)"]
+            d_fact = df_mo_editado.at[i, "Días / Factor"]
+            c_base = df_mo_editado.at[i, "Costo Base Unitario ($)"]
+            r_pct = df_mo_editado.at[i, "Rentabilidad (%)"] / 100.0
             
-            st.markdown("---")
-            c3, c4 = st.columns(2)
-            cant_inst = c3.number_input("Cantidad Instaladores", min_value=0, value=0)
-            dias_inst = c4.number_input("Días Instalador", min_value=0, value=0)
-            tarifa_inst = st.number_input("Costo Diario Instalador ($)", min_value=0.0, value=25.0)
+            # Recalcular Costo Interno Real
+            c_tot_int = c_pers * d_fact * c_base
+            df_mo_editado.at[i, "Costo Total Interno ($)"] = c_tot_int
             
-            st.markdown("---")
-            st.markdown("**Viáticos y Estadías:**")
-            c5, c6 = st.columns(2)
-            dias_estadia = c5.number_input("Días Estadía fuera de SS", min_value=0, value=0)
-            costo_estadia = c6.number_input("Costo Diario Estadía ($)", min_value=0.0, value=0.0)
-            
-            c7, c8 = st.columns(2)
-            dias_viaticos = c7.number_input("Días de Viáticos", min_value=0, value=0)
-            costo_viaticos = c8.number_input("Costo Diario Viáticos ($)", min_value=0.0, value=0.0)
-            
-            st.markdown("---")
-            st.markdown("**Soporte Especializado:**")
-            c9, c10 = st.columns(2)
-            dias_out = c9.number_input("Días Técnico Outsourcing", min_value=0, value=0)
-            costo_out = c10.number_input("Costo Diario Outsourcing ($)", min_value=0.0, value=0.0)
-            
-            c11, c12 = st.columns(2)
-            dias_noc = c11.number_input("Días Técnico Nocturno / Fin de Semana", min_value=0, value=0)
-            costo_noc = c12.number_input("Costo Diario Nocturno ($)", min_value=0.0, value=0.0)
-            
-            st.markdown("---")
-            st.markdown("**Movilización:**")
-            kms_proyecto = st.number_input("Kilómetros totales a recorrer (KM)", min_value=0.0, value=0.0)
-            
-            btn_guardar_mo = st.form_submit_button("Guardar Bloque Operativo")
+            # Recalcular Venta Final al Cliente
+            p_v_u_rec = (c_base * d_fact) / (1 - r_pct) if r_pct < 1 else (c_base * d_fact)
+            df_mo_editado.at[i, "Precio Venta Total ($)"] = p_v_u_rec * c_pers
 
-            if btn_guardar_mo:
-                c_conf_tot = cant_conf * dias_conf * tarifa_conf
-                c_inst_tot = cant_inst * dias_inst * tarifa_inst
-                c_est_tot = dias_estadia * costo_estadia
-                c_via_tot = dias_viaticos * costo_viaticos
-                c_out_tot = dias_out * costo_out
-                c_noc_tot = dias_noc * costo_noc
-                c_comb_tot = kms_proyecto * 0.36
-                
-                costo_operativo_total = c_conf_tot + c_inst_tot + c_est_tot + c_via_tot + c_out_tot + c_noc_tot + c_comb_tot
-                
-                st.session_state["mano_obra_bloque"] = {
-                    "Costo Interno": costo_operativo_total,
-                    "Rentabilidad Aplicada (%)": rent_mo,
-                    "Detalle": {
-                        "Configuradores": c_conf_tot,
-                        "Instaladores": c_inst_tot,
-                        "Estadía fuera de SS": c_est_tot,
-                        "Viáticos": c_via_tot,
-                        "Outsourcing": c_out_tot,
-                        "Nocturno/Finde": c_noc_tot,
-                        "Combustible": c_comb_tot
-                    }
-                }
-                st.success("¡Costos calculados y retenidos!")
-
-    with col_der:
-        st.markdown("#### 🔧 2. Certificaciones y Herramientas Especiales")
-        with st.form("form_herramientas"):
-            c_desc = st.text_input("Descripción del Item", placeholder="Ej. Certificación o Alquiler de Andamios")
-            c_monto = st.number_input("Costo Total ($)", min_value=0.0, value=0.0)
-            btn_add_h = st.form_submit_button("Agregar Herramienta")
+        st.session_state["mano_obra_items"] = df_mo_editado.to_dict(orient="records")
+        
+        # Botones de control para la tabla de MO
+        st.markdown(" ")
+        col_mo_b1, col_mo_b2 = st.columns([3, 10])
+        if col_mo_b1.button("🗑️ Eliminar Rubros Seleccionados", key="del_mo_btn"):
+            st.session_state["mano_obra_items"] = [x for x in st.session_state["mano_obra_items"] if not x["Borrar"]]
+            st.success("Tabla de mano de obra actualizada.")
+            st.rerun()
             
-            if btn_add_h and c_desc:
-                st.session_state["materiales"].append({
-                    "Borrar": False,
-                    "Descripción": f"[HERRAMIENTA] {c_desc}",
-                    "Cantidad": 1,
-                    "Costo Unitario ($)": float(c_monto),
-                    "Costo Total ($)": float(c_monto),
-                    "Rentabilidad (%)": 0.0,
-                    "Precio Venta U ($)": float(c_monto),
-                    "Precio Venta Total ($)": float(c_monto)
-                })
-                st.success("Agregado al proyecto.")
+        if col_mo_b2.button("Limpiar Tabla Operativa", key="clear_mo_all"):
+            st.session_state["mano_obra_items"] = []
+            st.rerun()
 
-        items_h = [x for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]")]
-        if items_h:
-            st.dataframe(pd.DataFrame(items_h)[["Descripción", "Costo Total ($)"]], hide_index=True, use_container_width=True)
-            if st.button("Limpiar Herramientas"):
-                st.session_state["materiales"] = [x for x in st.session_state["materiales"] if not x["Descripción"].startswith("[HERRAMIENTA]")]
-                st.rerun()
-
-    # Cálculo Local de totales para la Pestaña 3 para evitar problemas de ordenamiento
-    mo_datos = st.session_state["mano_obra_bloque"]
-    costo_interno_personal = mo_datos["Costo Interno"]
-    rent_actual_pct = mo_datos["Rentabilidad Aplicada (%)"] / 100.0
-    precio_cliente_personal = costo_interno_personal / (1 - rent_actual_pct) if rent_actual_pct < 1 else costo_interno_personal
-    total_herramientas = sum(x["Costo Total ($)"] for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]"))
-    
-    gran_costo_interno_mo = costo_interno_personal + total_herramientas
-    gran_precio_cliente_mo = precio_cliente_personal + total_herramientas
-
-    st.markdown("---")
-    st.markdown("### 📊 Balance de Costo de Operación de Mano de Obra")
-    cb1, cb2 = st.columns(2)
-    cb1.metric("A MÍ ME CUESTA (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
-    cb2.metric("AL CLIENTE LE CUESTA (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
+        # Desglose Financiero Integrado de la pestaña
+        st.markdown("---")
+        total_costo_a_mi = sum(x["Costo Total Interno ($)"] for x in st.session_state["mano_obra_items"])
+        total_venta_cliente = sum(x["Precio Venta Total ($)"] for x in st.session_state["mano_obra_items"])
+        
+        st.markdown("### 📊 Balance Financiero de la Pestaña")
+        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+        c_kpi1.metric("A MÍ ME CUESTA (Costo Interno)", f"${total_costo_a_mi:,.2f}")
+        c_kpi2.metric("AL CLIENTE LE CUESTA (Precio Venta)", f"${total_venta_cliente:,.2f}")
+        c_kpi3.metric("MARGEN RETENIDO ($)", f"${(total_venta_cliente - total_costo_a_mi):,.2f}")
 
 # --- PESTAÑA 4: LIQUIDACIÓN COMERCIAL TOTAL Y RESUMEN ---
 with tab4:
     st.subheader("📊 Resumen General de Cotización y Liquidación")
     
     lista_eq = st.session_state.get("equipos", [])
-    lista_mat = [x for x in st.session_state.get("materiales", []) if not x["Descripción"].startswith("[HERRAMIENTA]")]
+    lista_mat = st.session_state.get("materiales", [])
+    lista_mo = st.session_state.get("mano_obra_items", [])
     
+    # Consolidados Económicos por categoría
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     
     costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
     
-    # Recalculo global persistente de Mano de Obra
-    mo_datos_global = st.session_state["mano_obra_bloque"]
-    costo_pers_g = mo_datos_global["Costo Interno"]
-    rent_pers_g = mo_datos_global["Rentabilidad Aplicada (%)"] / 100.0
-    venta_pers_g = costo_pers_g / (1 - rent_pers_g) if rent_pers_g < 1 else costo_pers_g
-    total_herr_g = sum(x["Costo Total ($)"] for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]"))
+    costo_mo_tot = sum(x.get("Costo Total Interno ($)", 0.0) for x in lista_mo)
+    venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
     
-    costo_total_operativo = costo_pers_g + total_herr_g
-    venta_total_operativo = venta_pers_g + total_herr_g
-    
-    costo_total_proyecto = costo_equipos + costo_materiales + costo_total_operativo
-    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_total_operativo
+    # Totales absolutos del proyecto completo
+    costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
+    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
     
     iva_calc = subtotal_venta_proyecto * 0.13
     total_general_cliente = subtotal_venta_proyecto + iva_calc
@@ -319,7 +304,7 @@ with tab4:
     
     resumen_cliente = {
         "Descripción del Rubro": ["Suministro de Equipos de Seguridad", "Materiales e Insumos de Canalización", "Ingeniería, Mano de Obra y Logística"],
-        "Monto ($)": [venta_equipos, venta_materiales, venta_total_operativo]
+        "Monto ($)": [venta_equipos, venta_materiales, venta_mo_tot]
     }
     st.table(pd.DataFrame(resumen_cliente))
     
