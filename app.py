@@ -21,8 +21,9 @@ st.markdown("---")
 
 # 2. INFORMACIÓN DEL PROYECTO (Panel Izquierdo)
 st.sidebar.header("📋 Datos del Proyecto")
-# CAMBIO SOLICITADO: Ajustado a solo "Nombre del Proyecto"
+# CORREGIDO: Se mantiene el Nombre del Proyecto y se reincorpora la Empresa
 proyecto = st.sidebar.text_input("Nombre del Proyecto", "Proyecto Procaps El Salvador")
+empresa = st.sidebar.text_input("Empresa", "Alfa Security")
 atencion = st.sidebar.text_input("Atención a:", "Ing. Miguel Melendez")
 validez = st.sidebar.text_input("Validez de la Oferta", "15 Días")
 pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraentrega")
@@ -38,7 +39,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Resumen Comercial y Liquidación"
 ])
 
-# --- PESTAÑA 1: EQUIPOS PRINCIPALES (INGRESO MANUAL) ---
+# --- PESTAÑA 1: EQUIPOS PRINCIPALES (INGRESO MANUAL Y ELIMINACIÓN) ---
 with tab1:
     st.subheader("Componentes y Equipos de Seguridad Electrónica")
     st.info("Ingresa manualmente los equipos principales de distribuidores (Paneles, Sensores, Cámaras, etc.)")
@@ -63,11 +64,46 @@ with tab1:
             })
             st.success(f"Agregado: {desc_eq}")
 
+    # SECCIÓN NUEVA: Visualización y eliminación selectiva
     if st.session_state["equipos"]:
-        df_eq = pd.DataFrame(st.session_state["equipos"])
-        st.dataframe(df_eq.style.format({"Costo Unitario": "${:.2f}", "Costo Total": "${:.2f}", "Precio Venta U": "${:.2f}", "Precio Venta Total": "${:.2f}"}))
-        if st.button("Limpiar Equipos", key="btn_clear_eq"):
+        st.markdown("#### Lista de Equipos Cargados")
+        st.write("Si te equivocaste, marca la casilla del equipo y presiona 'Eliminar Equipos Seleccionados'.")
+        
+        # Creamos una lista temporal para guardar cuáles quiere borrar el usuario
+        equipos_a_eliminar = []
+        
+        # Encabezados de la tabla manual con columnas de acción
+        col_check, col_info = st.columns([1, 12])
+        
+        for i, eq in enumerate(st.session_state["equipos"]):
+            col_sel, col_det = st.columns([1, 12])
+            # Casilla de verificación individual para cada equipo usando su índice
+            marcado = col_sel.checkbox("", key=f"del_eq_{i}")
+            if marcado:
+                equipos_a_eliminar.append(i)
+                
+            # Mostramos los datos de manera ordenada en formato de texto formateado
+            col_det.markdown(
+                f"**{eq['Descripción']}** | Cantidad: {eq['Cantidad']} | "
+                f"Costo U: ${eq['Costo Unitario']:.2f} | Costo Total: ${eq['Costo Total']:.2f} | "
+                f"Precio Venta U: ${eq['Precio Venta U']:.2f} | Venta Total: ${eq['Precio Venta Total']:.2f}"
+            )
+        
+        st.markdown(" ")
+        col_btn1, col_btn2 = st.columns([3, 10])
+        
+        # Botón para borrar selectivamente los marcados
+        if col_btn1.button("🗑️ Eliminar Equipos Seleccionados", type="secondary"):
+            if equipos_a_eliminar:
+                # Borramos de atrás hacia adelante para no arruinar los índices de la lista original
+                for indice in sorted(equipos_a_eliminar, reverse=True):
+                    st.session_state["equipos"].pop(indice)
+                st.success("Equipos seleccionados eliminados correctamente.")
+                st.rerun()
+            else:
+                st.warning("Por favor, selecciona al menos una casilla para eliminar.")
+                
+        # Botón original para limpiar todo de un solo click
+        if col_btn2.button("Limpiar Toda la Lista", key="btn_clear_eq"):
             st.session_state["equipos"] = []
             st.rerun()
-
-# Las pestañas 2, 3 y 4 siguen procesando la información abajo con la misma lógica limpia.
