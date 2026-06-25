@@ -21,15 +21,11 @@ st.markdown("---")
 
 # 2. INFORMACIÓN DEL PROYECTO (Panel Izquierdo)
 st.sidebar.header("📋 Datos del Proyecto")
-# CORREGIDO: Se mantiene el Nombre del Proyecto y se reincorpora la Empresa
 proyecto = st.sidebar.text_input("Nombre del Proyecto", "Proyecto Procaps El Salvador")
 empresa = st.sidebar.text_input("Empresa", "Alfa Security")
 atencion = st.sidebar.text_input("Atención a:", "Ing. Miguel Melendez")
 validez = st.sidebar.text_input("Validez de la Oferta", "15 Días")
 pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraentrega")
-
-# Rentabilidad blindada al 40% (Margen sobre el precio de venta final)
-MARGEN = 0.40
 
 # PESTAÑAS PRINCIPALES DE LA INTERFAZ
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -39,71 +35,91 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Resumen Comercial y Liquidación"
 ])
 
-# --- PESTAÑA 1: EQUIPOS PRINCIPALES (INGRESO MANUAL Y ELIMINACIÓN) ---
+# --- PESTAÑA 1: EQUIPOS PRINCIPALES (TABLA INTERACTIVA EDITABLE Y BORRABLE) ---
 with tab1:
     st.subheader("Componentes y Equipos de Seguridad Electrónica")
-    st.info("Ingresa manualmente los equipos principales de distribuidores (Paneles, Sensores, Cámaras, etc.)")
+    st.info("Ingresa los equipos principales. Podrás ajustar la rentabilidad directamente en la tabla de abajo.")
     
     with st.form("form_equipos"):
-        col1, col2, col3 = st.columns([3, 1, 1])
-        desc_eq = col1.text_input("Descripción del Equipo", placeholder="Ej. Panel de Incendio Inteligente Honeywell de 1 SLC")
+        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+        desc_eq = col1.text_input("Descripción del Equipo", placeholder="Ej. Panel de Incendio Honeywell 1 SLC")
         cant_eq = col2.number_input("Cantidad", min_value=1, value=1, step=1)
         costo_eq = col3.number_input("Costo Unitario ($)", min_value=0.0, value=0.0, step=10.0)
+        # Rentabilidad inicial sugerida (40%)
+        rent_inicial = col4.number_input("Rentabilidad Inicial (%)", min_value=0.0, max_value=99.0, value=40.0, step=5.0)
         
         btn_eq = st.form_submit_button("Agregar Equipo")
         
         if btn_eq and desc_eq:
-            precio_venta_u = costo_eq / (1 - MARGEN)
+            margen_decimal = rent_inicial / 100.0
+            precio_venta_u = costo_eq / (1 - margen_decimal) if margen_decimal < 1 else costo_eq
+            
             st.session_state["equipos"].append({
+                "Borrar": False,
                 "Descripción": desc_eq,
                 "Cantidad": cant_eq,
-                "Costo Unitario": costo_eq,
-                "Costo Total": costo_eq * cant_eq,
-                "Precio Venta U": precio_venta_u,
-                "Precio Venta Total": precio_venta_u * cant_eq
+                "Costo Unitario ($)": float(costo_eq),
+                "Costo Total ($)": float(costo_eq * cant_eq),
+                "Rentabilidad (%)": float(rent_inicial),
+                "Precio Venta U ($)": float(precio_venta_u),
+                "Precio Venta Total ($)": float(precio_venta_u * cant_eq)
             })
             st.success(f"Agregado: {desc_eq}")
 
-    # SECCIÓN NUEVA: Visualización y eliminación selectiva
+    # SECCIÓN DE LA TABLA COMPLETA
     if st.session_state["equipos"]:
-        st.markdown("#### Lista de Equipos Cargados")
-        st.write("Si te equivocaste, marca la casilla del equipo y presiona 'Eliminar Equipos Seleccionados'.")
+        st.markdown("#### 📊 Lista de Equipos Cargados")
+        st.caption("Tip: Puedes editar la 'Rentabilidad (%)' o la 'Cantidad' directamente en la celda. Marca 'Borrar' y presiona el botón inferior si deseas quitar un equipo.")
         
-        # Creamos una lista temporal para guardar cuáles quiere borrar el usuario
-        equipos_a_eliminar = []
+        # Convertimos la lista de memoria a un DataFrame de Pandas
+        df_original = pd.DataFrame(st.session_state["equipos"])
         
-        # Encabezados de la tabla manual con columnas de acción
-        col_check, col_info = st.columns([1, 12])
+        # Usamos st.data_editor para renderizar una tabla verdaderamente interactiva
+        df_editado = st.data_editor(
+            df_original,
+            hide_index=True,
+            use_container_width=True,
+            disabled=["Descripción", "Costo Unitario ($)", "Costo Total ($)", "Precio Venta U ($)", "Precio Venta Total ($)"],
+            column_config={
+                "Borrar": st.column_config.CheckboxColumn("Seleccionar para Borrar", default=False),
+                "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99, step=1),
+                "Costo Unitario ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Costo Total ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Precio Venta U ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Precio Venta Total ($)": st.column_config.NumberColumn(format="$%.2f"),
+            }
+        )
         
-        for i, eq in enumerate(st.session_state["equipos"]):
-            col_sel, col_det = st.columns([1, 12])
-            # Casilla de verificación individual para cada equipo usando su índice
-            marcado = col_sel.checkbox("", key=f"del_eq_{i}")
-            if marcado:
-                equipos_a_eliminar.append(i)
-                
-            # Mostramos los datos de manera ordenada en formato de texto formateado
-            col_det.markdown(
-                f"**{eq['Descripción']}** | Cantidad: {eq['Cantidad']} | "
-                f"Costo U: ${eq['Costo Unitario']:.2f} | Costo Total: ${eq['Costo Total']:.2f} | "
-                f"Precio Venta U: ${eq['Precio Venta U']:.2f} | Venta Total: ${eq['Precio Venta Total']:.2f}"
-            )
+        # Recalcular automáticamente si el usuario editó cantidades o rentabilidades en la tabla
+        for i in range(len(df_editado)):
+            r_pct = df_editado.at[i, "Rentabilidad (%)"] / 100.0
+            c_uni = df_editado.at[i, "Costo Unitario ($)"]
+            cant = df_editado.at[i, "Cantidad"]
+            
+            # Re-calculamos fórmulas financieras sobre la marcha
+            df_editado.at[i, "Costo Total ($)"] = c_uni * cant
+            p_venta_u = c_uni / (1 - r_pct) if r_pct < 1 else c_uni
+            df_editado.at[i, "Precio Venta U ($)"] = p_venta_u
+            df_editado.at[i, "Precio Venta Total ($)"] = p_venta_u * cant
+
+        # Sincronizamos los cambios de vuelta a la memoria interna de la sesión
+        st.session_state["equipos"] = df_editado.to_dict(orient="records")
         
+        # Acciones de limpieza de la tabla
         st.markdown(" ")
         col_btn1, col_btn2 = st.columns([3, 10])
         
-        # Botón para borrar selectivamente los marcados
-        if col_btn1.button("🗑️ Eliminar Equipos Seleccionados", type="secondary"):
-            if equipos_a_eliminar:
-                # Borramos de atrás hacia adelante para no arruinar los índices de la lista original
-                for indice in sorted(equipos_a_eliminar, reverse=True):
-                    st.session_state["equipos"].pop(indice)
-                st.success("Equipos seleccionados eliminados correctamente.")
+        if col_btn1.button("🗑️ Aplicar Eliminación de Marcados"):
+            # Filtramos dejando únicamente los equipos que NO tengan la casilla 'Borrar' activa
+            equipos_restantes = [eq for eq in st.session_state["equipos"] if not eq["Borrar"]]
+            if len(equipos_restantes) < len(st.session_state["equipos"]):
+                st.session_state["equipos"] = equipos_restantes
+                st.success("Los equipos seleccionados han sido removidos.")
                 st.rerun()
             else:
-                st.warning("Por favor, selecciona al menos una casilla para eliminar.")
+                st.warning("No has marcado ninguna casilla en la columna 'Borrar'.")
                 
-        # Botón original para limpiar todo de un solo click
         if col_btn2.button("Limpiar Toda la Lista", key="btn_clear_eq"):
             st.session_state["equipos"] = []
             st.rerun()
