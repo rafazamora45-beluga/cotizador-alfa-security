@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 
 # 1. INICIALIZACIÓN ABSOLUTA DEL ESTADO DE LA SESIÓN
-# Esto asegura que las variables existan desde el milisegundo uno en memoria
 if "equipos" not in st.session_state:
     st.session_state["equipos"] = []
 if "materiales" not in st.session_state:
@@ -10,7 +9,7 @@ if "materiales" not in st.session_state:
 if "mano_obra" not in st.session_state:
     st.session_state["mano_obra"] = []
 
-# Configuración de la página y diseño visual estilizado para Alfa Security
+# Configuración de la página y diseño visual
 st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="wide")
 
 # Título y Encabezado Corporativo
@@ -45,7 +44,9 @@ with tab1:
         desc_eq = col1.text_input("Descripción del Equipo", placeholder="Ej. Panel de Incendio Inteligente Honeywell de 1 SLC")
         cant_eq = col2.number_input("Cantidad", min_value=1, value=1, step=1)
         costo_eq = col3.number_input("Costo Unitario ($)", min_value=0.0, value=0.0, step=10.0)
-        btn_eq = st.form_submit_with_button("Agregar Equipo")
+        
+        # CORREGIDO: st.form_submit_button es la sintaxis real
+        btn_eq = st.form_submit_button("Agregar Equipo")
         
         if btn_eq and desc_eq:
             precio_venta_u = costo_eq / (1 - MARGEN)
@@ -64,21 +65,16 @@ with tab1:
         st.dataframe(df_eq.style.format({"Costo Unitario": "${:.2f}", "Costo Total": "${:.2f}", "Precio Venta U": "${:.2f}", "Precio Venta Total": "${:.2f}"}))
         if st.button("Limpiar Equipos", key="btn_clear_eq"):
             st.session_state["equipos"] = []
-            try:
-                st.rerun()
-            except:
-                pass
+            st.rerun()
 
 # --- PESTAÑA 2: BUSCADOR EN VIVO (FREUND) ---
 with tab2:
-    st.subheader("Conexión en Vivo con Freund Ferretería")
-    st.markdown("Busca tuberías EMT, cajas, cables o abrazaderas en tiempo real en El Salvador.")
+    st.subheader("Conexión de Catálogo (Ferretería)")
+    st.markdown("Busca tuberías EMT, cajas, cables o abrazaderas.")
     
     buscar_termino = st.text_input("¿Qué material necesitas buscar?", placeholder="Ej. tuberia emt")
     
     if buscar_termino:
-        st.write(f"Buscando '{buscar_termino}'...")
-        
         # Base de datos optimizada libre de errores
         materiales_respaldo = [
             {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 3/4 PLG (6MT)", "price": 4.25},
@@ -95,8 +91,7 @@ with tab2:
         if coincidencias:
             st.info("Mostrando resultados disponibles en catálogo:")
             for m in coincidencias:
-                col_img, col_desc, col_accion = st.columns([1, 3, 2])
-                col_img.image("https://via.placeholder.com/100", width=80) 
+                col_desc, col_accion = st.columns([3, 2])
                 col_desc.markdown(f"**{m['name']}**\n\nCódigo SKU: {m['sku']} | **Costo Base: ${m['price']:.2f}**")
                 
                 cant_m = col_accion.number_input(f"Cantidad a añadir", min_value=1, value=1, step=1, key=f"cant_{m['sku']}")
@@ -125,7 +120,9 @@ with tab3:
         personal = col2.number_input("N° de Personas", min_value=1, value=2)
         dias = col3.number_input("Días de Trabajo", min_value=1, value=5)
         tarifa = col4.number_input("Costo Diario por Persona ($)", min_value=0.0, value=25.0, step=5.0)
-        btn_obra = st.form_submit_with_button("Añadir Mano de Obra")
+        
+        # CORREGIDO: st.form_submit_button
+        btn_obra = st.form_submit_button("Añadir Mano de Obra")
         
         if btn_obra and rol:
             costo_mo_total = personal * dias * tarifa
@@ -145,21 +142,16 @@ with tab3:
         st.dataframe(df_mo.style.format({"Costo Diario": "${:.2f}", "Costo Total": "${:.2f}", "Precio Venta Total": "${:.2f}"}))
         if st.button("Limpiar Mano de Obra", key="btn_clear_mo"):
             st.session_state["mano_obra"] = []
-            try:
-                st.rerun()
-            except:
-                pass
+            st.rerun()
 
 # --- PESTAÑA 4: RESUMEN COMERCIAL Y LIQUIDACIÓN ---
 with tab4:
     st.subheader("💸 Liquidación Final del Proyecto")
     
-    # Uso seguro de .get() para evitar KeyErrors si Streamlit limpia la memoria de la sesión
     lista_equipos = st.session_state.get("equipos", [])
     lista_materiales = st.session_state.get("materiales", [])
     lista_mano_obra = st.session_state.get("mano_obra", [])
     
-    # Cálculos Financieros Consolidados con validación segura
     costo_equipos = sum(x.get("Costo Total", 0.0) for x in lista_equipos)
     venta_equipos = sum(x.get("Precio Venta Total", 0.0) for x in lista_equipos)
     
@@ -174,14 +166,11 @@ with tab4:
     
     utilidad_neta = venta_proyecto_total - costo_proyecto_total
     
-    # Control de división por cero si la cotización arranca vacía
     margen_real = (utilidad_neta / venta_proyecto_total) * 100 if venta_proyecto_total > 0 else 0.0
     
-    # Impuestos de El Salvador (IVA 13%)
     iva = venta_proyecto_total * 0.13
     gran_total = venta_proyecto_total + iva
     
-    # Renderizado seguro de KPI Financieros
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Costo Total Alfa Security", f"${costo_proyecto_total:,.2f}")
     c2.metric("Precio de Venta (Subtotal)", f"${venta_proyecto_total:,.2f}")
@@ -190,9 +179,8 @@ with tab4:
     
     st.markdown("### Desglose Comercial para Presentación")
     
-    # Tabla formal consolidada para copiar o exportar
     resumen_datos = {
-        "Rubro de Inversión": ["Equipos Electrónicos", "Materiales y Canalización (Freund)", "Ingeniería y Mano de Obra"],
+        "Rubro de Inversión": ["Equipos Electrónicos", "Materiales y Canalización", "Ingeniería y Mano de Obra"],
         "Costo Base ($)": [costo_equipos, costo_materiales, costo_mo],
         "Precio de Venta ($)": [venta_equipos, venta_materiales, venta_mo]
     }
