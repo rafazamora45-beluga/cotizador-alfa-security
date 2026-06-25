@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -16,15 +15,7 @@ if "mano_obra_bloque" not in st.session_state:
     st.session_state["mano_obra_bloque"] = {
         "Costo Interno": 0.0,
         "Rentabilidad Aplicada (%)": 20.0,
-        "Detalle": {
-            "Configuradores": 0.0,
-            "Instaladores": 0.0,
-            "Estadía fuera de SS": 0.0,
-            "Viáticos": 0.0,
-            "Outsourcing": 0.0,
-            "Nocturno/Finde": 0.0,
-            "Combustible": 0.0
-        }
+        "Detalle": {}
     }
 
 # Configuración de la página y diseño visual
@@ -158,7 +149,7 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
-# --- PESTAÑA 3: MANO DE OBRA (FORMULARIO ESTRUCTURADO CON KM EDITABLE) ---
+# --- PESTAÑA 3: MANO DE OBRA (FORMULARIO FIJO ORIGINAL CON KM EDITABLE) ---
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
     st.info("Configura los costos operativos globales. El bloque técnico calcula por defecto una rentabilidad del 20% editable.")
@@ -168,7 +159,6 @@ with tab3:
     with col_izq:
         st.markdown("#### ⚙️ 1. Personal Técnico y Logística")
         rent_mo = st.number_input("Rentabilidad Comercial del Bloque (%)", min_value=0.0, max_value=99.0, value=20.0, step=5.0, key="rent_mo_p3")
-        margen_mo_dec = rent_mo / 100.0
 
         with st.form("form_mano_obra_completo"):
             st.markdown("**Carga de Personal:**")
@@ -205,7 +195,6 @@ with tab3:
             
             st.markdown("---")
             st.markdown("**Movilización:**")
-            # CAMBIO SOLICITADO: El costo por kilómetro ahora es completamente personalizable en la interfaz
             col_km1, col_km2 = st.columns(2)
             kms_proyecto = col_km1.number_input("Kilómetros totales a recorrer (KM)", min_value=0.0, value=0.0)
             costo_por_km = col_km2.number_input("Precio / Costo por Kilómetro ($)", min_value=0.0, value=0.36, step=0.05, format="%.2f")
@@ -224,16 +213,17 @@ with tab3:
                 costo_operativo_total = c_conf_tot + c_inst_tot + c_est_tot + c_via_tot + c_out_tot + c_noc_tot + c_comb_tot
                 
                 st.session_state["mano_obra_bloque"] = {
+                    "Costo Interno": operativo_total if 'costo_operativo_total' in locals() else 0.0,
                     "Costo Interno": costo_operativo_total,
                     "Rentabilidad Aplicada (%)": rent_mo,
                     "Detalle": {
-                        "Configuradores": c_conf_tot,
-                        "Instaladores": c_inst_tot,
-                        "Estadía fuera de SS": c_est_tot,
-                        "Viáticos": c_via_tot,
-                        "Outsourcing": c_out_tot,
-                        "Nocturno/Finde": c_noc_tot,
-                        "Combustible": c_comb_tot
+                        "Servicio de Configuración Especializada": c_conf_tot,
+                        "Servicio de Técnico Instalador": c_inst_tot,
+                        "Logística de Estadía fuera de San Salvador": c_est_tot,
+                        "Viáticos de Alimentación y Campo": c_via_tot,
+                        "Soporte de Técnico Outsourcing": c_out_tot,
+                        "Servicio Técnico Nocturno / Fin de Semana": c_noc_tot,
+                        "Movilización y Combustible del Proyecto": c_comb_tot
                     }
                 }
                 st.success("¡Costos calculados y retenidos!")
@@ -265,7 +255,7 @@ with tab3:
                 st.session_state["materiales"] = [x for x in st.session_state["materiales"] if not x["Descripción"].startswith("[HERRAMIENTA]")]
                 st.rerun()
 
-    # Cálculo local y dinámico de los balances de la Pestaña 3
+    # Cálculo local de totales para la Pestaña 3
     mo_datos = st.session_state["mano_obra_bloque"]
     costo_interno_personal = mo_datos["Costo Interno"]
     rent_actual_pct = mo_datos["Rentabilidad Aplicada (%)"] / 100.0
@@ -281,31 +271,52 @@ with tab3:
     cb1.metric("A MÍ ME CUESTA (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
     cb2.metric("AL CLIENTE LE CUESTA (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
 
-# --- PESTAÑA 4: LIQUIDACIÓN COMERCIAL TOTAL Y RESUMEN ---
+# --- PESTAÑA 4: LIQUIDACIÓN COMERCIAL TOTAL Y DESGLOSE COMPLETO ---
 with tab4:
     st.subheader("📊 Resumen General de Cotización y Liquidación")
     
     lista_eq = st.session_state.get("equipos", [])
     lista_mat = [x for x in st.session_state.get("materiales", []) if not x["Descripción"].startswith("[HERRAMIENTA]")]
+    items_herramientas = [x for x in st.session_state.get("materiales", []) if x["Descripción"].startswith("[HERRAMIENTA]")]
     
+    # Consolidados básicos
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     
     costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
     
-    # Lectura unificada desde st.session_state para evitar quiebres de variables cruzadas
+    # Procesar e inyectar el desglose dinámico de servicios
     mo_datos_global = st.session_state["mano_obra_bloque"]
-    costo_pers_g = mo_datos_global["Costo Interno"]
-    rent_pers_g = mo_datos_global["Rentabilidad Aplicada (%)"] / 100.0
-    venta_pers_g = costo_pers_g / (1 - rent_pers_g) if rent_pers_g < 1 else costo_pers_g
-    total_herr_g = sum(x["Costo Total ($)"] for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]"))
+    rent_mo_pct = mo_datos_global["Rentabilidad Aplicada (%)"] / 100.0
     
-    costo_total_operativo = costo_pers_g + total_herr_g
-    venta_total_operativo = venta_pers_g + total_herr_g
+    desglose_servicios_filas = []
+    costo_mo_tot = 0.0
+    venta_mo_tot = 0.0
     
-    costo_total_proyecto = costo_equipos + costo_materiales + costo_total_operativo
-    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_total_operativo
+    # Desglosamos individualmente cada item del diccionario si su costo es mayor a 0
+    for nombre_servicio, costo_interno in mo_datos_global.get("Detalle", {}).items():
+        if costo_interno > 0:
+            precio_venta_servicio = costo_interno / (1 - rent_mo_pct) if rent_mo_pct < 1 else costo_interno
+            desglose_servicios_filas.append({
+                "Descripción del Rubro": nombre_servicio,
+                "Monto ($)": precio_venta_servicio
+            })
+            costo_mo_tot += costo_interno
+            venta_mo_tot += precio_venta_servicio
+            
+    # Sumar las herramientas especiales al bloque operativo de servicios
+    for herr in items_herramientas:
+        desglose_servicios_filas.append({
+            "Descripción del Rubro": herr["Descripción"],
+            "Monto ($)": herr["Precio Venta Total ($)"]
+        })
+        costo_mo_tot += herr["Costo Total ($)"]
+        venta_mo_tot += herr["Precio Venta Total ($)"]
+    
+    # Totales del proyecto completo
+    costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
+    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
     
     iva_calc = subtotal_venta_proyecto * 0.13
     total_general_cliente = subtotal_venta_proyecto + iva_calc
@@ -320,11 +331,22 @@ with tab4:
     st.markdown("#### 📄 Datos de cara al Cliente para la Propuesta")
     st.write(f"**Proyecto:** {proyecto} | **Empresa:** {empresa} | **Atención:** {atencion}")
     
-    resumen_cliente = {
-        "Descripción del Rubro": ["Suministro de Equipos de Seguridad", "Materiales e Insumos de Canalización", "Ingeniería, Mano de Obra y Logística"],
-        "Monto ($)": [venta_equipos, venta_materiales, venta_total_operativo]
-    }
-    st.table(pd.DataFrame(resumen_cliente))
+    # DESGLOSE TOTAL ADAPTADO EXACTAMENTE A TU DISEÑO SOLICITADO
+    tabla_final_items = []
+    
+    # Agregar Equipos
+    if venta_equipos > 0:
+        tabla_final_items.append({"Descripción del Rubro": "Suministro de Equipos de Seguridad", "Monto ($)": venta_equipos})
+    # Agregar Materiales
+    if venta_materiales > 0:
+        tabla_final_items.append({"Descripción del Rubro": "Materiales e Insumos de Canalización", "Monto ($)": venta_materiales})
+    # Agregar cada uno de los servicios desglosados de manera independiente
+    tabla_final_items.extend(desglose_servicios_filas)
+    
+    if tabla_final_items:
+        st.table(pd.DataFrame(tabla_final_items))
+    else:
+        st.warning("No hay rubros cargados todavía en la cotización.")
     
     col_f1, col_f2 = st.columns(2)
     col_f1.markdown(f"""
