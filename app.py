@@ -9,6 +9,8 @@ if "equipos" not in st.session_state:
     st.session_state["equipos"] = []
 if "materiales" not in st.session_state:
     st.session_state["materiales"] = []
+
+# Inicialización segura de Mano de Obra para evitar NameError en cualquier pestaña
 if "mano_obra_bloque" not in st.session_state:
     st.session_state["mano_obra_bloque"] = {
         "Costo Interno": 0.0,
@@ -127,7 +129,6 @@ with tab2:
     st.subheader("Conexión de Catálogo (Ferretería Freund)")
     buscar_termino = st.text_input("¿Qué material o SKU necesitas buscar?", placeholder="Ej. tuberia emt")
     
-    # Base local estable para evitar problemas de conexión externa inmediata
     materiales_respaldo = [
         {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 3/4 PLG (6MT)", "price": 4.25},
         {"sku": "24847137", "name": "UNION EMT PRESION 3/4 PLG", "price": 0.95},
@@ -144,7 +145,6 @@ with tab2:
                 col_desc.markdown(f"**{m['name']}** - Costo: ${m['price']:.2f}")
                 cant_m = col_accion.number_input("Cantidad", min_value=1, value=1, key=f"f_cant_{i}")
                 if col_accion.button("Agregar", key=f"f_btn_{i}"):
-                    # Margen del 40% por defecto para materiales de ferretería
                     p_v = m['price'] / (1 - 0.40)
                     st.session_state["materiales"].append({
                         "Borrar": False,
@@ -158,7 +158,7 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
-# --- PESTAÑA 3: MANO DE OBRA Y COSTOS OPERATIVOS (CORREGIDA Y COMPLETA) ---
+# --- PESTAÑA 3: MANO DE OBRA Y COSTOS OPERATIVOS ---
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
     st.info("Configura los costos operativos. El bloque técnico calcula por defecto una rentabilidad del 20% editable.")
@@ -262,20 +262,18 @@ with tab3:
                 st.session_state["materiales"] = [x for x in st.session_state["materiales"] if not x["Descripción"].startswith("[HERRAMIENTA]")]
                 st.rerun()
 
-    # BALANCE DE LA PESTAÑA
-    st.markdown("---")
-    st.markdown("### 📊 Balance de Costo de Operación de Mano de Obra")
-    
+    # Cálculo Local de totales para la Pestaña 3 para evitar problemas de ordenamiento
     mo_datos = st.session_state["mano_obra_bloque"]
     costo_interno_personal = mo_datos["Costo Interno"]
     rent_actual_pct = mo_datos["Rentabilidad Aplicada (%)"] / 100.0
     precio_cliente_personal = costo_interno_personal / (1 - rent_actual_pct) if rent_actual_pct < 1 else costo_interno_personal
-    
     total_herramientas = sum(x["Costo Total ($)"] for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]"))
     
     gran_costo_interno_mo = costo_interno_personal + total_herramientas
     gran_precio_cliente_mo = precio_cliente_personal + total_herramientas
 
+    st.markdown("---")
+    st.markdown("### 📊 Balance de Costo de Operación de Mano de Obra")
     cb1, cb2 = st.columns(2)
     cb1.metric("A MÍ ME CUESTA (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
     cb2.metric("AL CLIENTE LE CUESTA (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
@@ -284,7 +282,6 @@ with tab3:
 with tab4:
     st.subheader("📊 Resumen General de Cotización y Liquidación")
     
-    # Cálculos globales unificados
     lista_eq = st.session_state.get("equipos", [])
     lista_mat = [x for x in st.session_state.get("materiales", []) if not x["Descripción"].startswith("[HERRAMIENTA]")]
     
@@ -294,9 +291,15 @@ with tab4:
     costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
     
-    # Integración del bloque de mano de obra
-    costo_total_operativo = gran_costo_interno_mo
-    venta_total_operativo = gran_precio_cliente_mo
+    # Recalculo global persistente de Mano de Obra
+    mo_datos_global = st.session_state["mano_obra_bloque"]
+    costo_pers_g = mo_datos_global["Costo Interno"]
+    rent_pers_g = mo_datos_global["Rentabilidad Aplicada (%)"] / 100.0
+    venta_pers_g = costo_pers_g / (1 - rent_pers_g) if rent_pers_g < 1 else costo_pers_g
+    total_herr_g = sum(x["Costo Total ($)"] for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]"))
+    
+    costo_total_operativo = costo_pers_g + total_herr_g
+    venta_total_operativo = venta_pers_g + total_herr_g
     
     costo_total_proyecto = costo_equipos + costo_materiales + costo_total_operativo
     subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_total_operativo
@@ -304,7 +307,6 @@ with tab4:
     iva_calc = subtotal_venta_proyecto * 0.13
     total_general_cliente = subtotal_venta_proyecto + iva_calc
     
-    # Vista de métricas internas
     st.markdown("#### 🔒 Panel Privado Alfa Security")
     c_liq1, c_liq2, c_liq3 = st.columns(3)
     c_liq1.metric("Costo Total Operativo Interno", f"${costo_total_proyecto:,.2f}")
@@ -322,4 +324,12 @@ with tab4:
     st.table(pd.DataFrame(resumen_cliente))
     
     col_f1, col_f2 = st.columns(2)
-    col
+    col_f1.markdown(f"""
+    * **Términos de Pago:** {pago}
+    * **Validez de Oferta:** {validez}
+    """)
+    col_f2.markdown(f"""
+    * **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}
+    * **IVA (13%):** ${iva_calc:,.2f}
+    * **TOTAL NETO:** **${total_general_cliente:,.2f}**
+    """)
