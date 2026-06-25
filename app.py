@@ -96,7 +96,17 @@ with tab1:
 
         st.session_state["equipos"] = df_editado.to_dict(orient="records")
         
+        # --- NUEVO: Totales en la parte inferior de Equipos Principales ---
+        total_costo_interno_eq = sum(x["Costo Total ($)"] for x in st.session_state["equipos"])
+        total_venta_eq = sum(x["Precio Venta Total ($)"] for x in st.session_state["equipos"])
+        
         st.markdown(" ")
+        ceq1, ceq2 = st.columns(2)
+        ceq1.metric("Costo Interno Total (Equipos)", f"${total_costo_interno_eq:,.2f}")
+        ceq2.metric("Precio de Venta Total (Equipos)", f"${total_venta_eq:,.2f}")
+        # -----------------------------------------------------------------
+        
+        st.markdown("---")
         col_btn1, col_btn2 = st.columns([3, 10])
         
         if col_btn1.button("🗑️ Aplicar Eliminación de Marcados", key="del_eq"):
@@ -400,7 +410,6 @@ with tab4:
             }
             df_grafico = pd.DataFrame(data_grafico)
             
-            # Generación limpia del gráfico circular corregido sin parámetros depreciados
             fig = px.pie(
                 df_grafico, 
                 values="Utilidad ($)", 
