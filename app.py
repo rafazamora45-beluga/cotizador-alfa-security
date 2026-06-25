@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 # 1. INICIALIZACIÓN ABSOLUTA DEL ESTADO DE LA SESIÓN
 if "equipos" not in st.session_state:
     st.session_state["equipos"] = []
 if "materiales" not in st.session_state:
     st.session_state["materiales"] = []
-
-# Inicialización de la lista de servicios dinámicos para Mano de Obra
 if "servicios_mo" not in st.session_state:
     st.session_state["servicios_mo"] = []
 
@@ -31,7 +30,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
     "🔍 Buscador Freund (Materiales)", 
     "🛠️ Mano de Obra", 
-    "📊 Resumen Comercial y Liquidación"
+    "📊 Resumen Comercial"
 ])
 
 # --- PESTAÑA 1: EQUIPOS PRINCIPALES ---
@@ -142,7 +141,7 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
-# --- PESTAÑA 3: MANO DE OBRA (CON TABLA INTERACTIVA INTEGRAL) ---
+# --- PESTAÑA 3: MANO DE OBRA ---
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
     st.info("Configura los costos operativos globales. Al presionar 'Agregar al Balance', el servicio se sumará a la tabla interactiva inferior.")
@@ -195,7 +194,6 @@ with tab3:
             btn_guardar_mo = st.form_submit_button("Agregar al Balance Operativo")
 
             if btn_guardar_mo:
-                # Mapeo de cálculos individuales
                 servicios_nuevos = [
                     ("Servicio de Configuración Especializada", cant_conf * dias_conf, tarifa_conf),
                     ("Servicio de Técnico Instalador", cant_inst * dias_inst, tarifa_inst),
@@ -254,12 +252,11 @@ with tab3:
 
     # --- TABLA INTERACTIVA DE BALANCE DE COSTOS ---
     st.markdown("---")
-    st.markdown("### 📊 Balance del Costo de Operación y Logística")
+    st.markdown("### 📊 Balance del Costo de Operación de Mano de Obra")
     
     if st.session_state["servicios_mo"]:
         df_mo_original = pd.DataFrame(st.session_state["servicios_mo"])
         
-        # Data editor interactivo para modificar Rentabilidades y Cantidades al vuelo
         df_mo_editado = st.data_editor(
             df_mo_original,
             hide_index=True,
@@ -276,7 +273,6 @@ with tab3:
             }
         )
         
-        # Recálculos automáticos basados en la interacción del usuario en la tabla
         for i in range(len(df_mo_editado)):
             r_pct = df_mo_editado.at[i, "Rentabilidad (%)"] / 100.0
             c_uni = df_mo_editado.at[i, "Costo Unitario ($)"]
@@ -289,7 +285,6 @@ with tab3:
 
         st.session_state["servicios_mo"] = df_mo_editado.to_dict(orient="records")
         
-        # Acciones para borrar agregados
         col_mo_b1, col_mo_b2 = st.columns([3, 10])
         if col_mo_b1.button("🗑️ Eliminar Servicios Seleccionados", key="del_mo_sel"):
             st.session_state["servicios_mo"] = [s for s in st.session_state["servicios_mo"] if not s["Borrar"]]
@@ -300,7 +295,6 @@ with tab3:
             st.session_state["servicios_mo"] = []
             st.rerun()
             
-        # Métricas Globales de Mano de Obra en tiempo real
         gran_costo_interno_mo = sum(x["Costo Interno ($)"] for x in st.session_state["servicios_mo"])
         gran_precio_cliente_mo = sum(x["Precio Venta Total ($)"] for x in st.session_state["servicios_mo"])
         
@@ -311,67 +305,111 @@ with tab3:
     else:
         st.warning("No hay registros en la tabla de balance de operación.")
 
-# --- PESTAÑA 4: RESUMEN COMERCIAL Y LIQUIDACIÓN ---
+# --- PESTAÑA 4: RESUMEN COMERCIAL (ACTUALIZADA) ---
 with tab4:
-    st.subheader("📊 Resumen General de Cotización y Liquidación")
+    st.subheader("📊 Resumen General Comercial")
     
     lista_eq = st.session_state.get("equipos", [])
     lista_mat = st.session_state.get("materiales", [])
     lista_mo = st.session_state.get("servicios_mo", [])
     
-    # Cálculos dinámicos finales leyendo de las respectivas tablas
+    # 1. CÁLCULO DE COSTOS Y VENTAS POR SECCIÓN
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
+    utilidad_equipos = venta_equipos - costo_equipos
     
     costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
+    utilidad_materiales = venta_materiales - costo_materiales
     
     costo_mo_tot = sum(x.get("Costo Interno ($)", 0.0) for x in lista_mo)
     venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
+    utilidad_mo = venta_mo_tot - costo_mo_tot
     
-    # Totales absolutos
+    # Consolidados totales del proyecto
     costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
     subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
+    utilidad_total = subtotal_venta_proyecto - costo_total_proyecto
+    
+    # Cálculo de la Rentabilidad Real (Basada en Margen sobre Precio de Venta)
+    rentabilidad_real_pct = (utilidad_total / subtotal_venta_proyecto * 100) if subtotal_venta_proyecto > 0 else 0.0
     
     iva_calc = subtotal_venta_proyecto * 0.13
     total_general_cliente = subtotal_venta_proyecto + iva_calc
     
-    st.markdown("#### 🔒 Panel Privado Alfa Security")
-    c_liq1, c_liq2, c_liq3 = st.columns(3)
-    c_liq1.metric("Costo Total Operativo Interno", f"${costo_total_proyecto:,.2f}")
-    c_liq2.metric("Precio de Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
-    c_liq3.metric("Utilidad Total Retenida", f"${(subtotal_venta_proyecto - costo_total_proyecto):,.2f}")
+    # INTERFAZ: RENTABILIDAD OBJETIVO VS REAL
+    st.markdown("#### 🎯 Análisis de Rentabilidad y Objetivos")
+    col_rent1, col_rent2, col_rent3 = st.columns(3)
     
-    st.markdown("---")
-    st.markdown("#### 📄 Datos de cara al Cliente para la Propuesta")
-    st.write(f"**Proyecto:** {proyecto} | **Empresa:** {empresa} | **Atención:** {atencion}")
+    rent_objetivo = col_rent1.number_input("Fijar Rentabilidad Objetivo (%)", min_value=0.0, max_value=100.0, value=30.0, step=1.0)
+    col_rent2.metric("Rentabilidad Real del Proyecto", f"{rentabilidad_real_pct:.2f}%")
     
-    # Armado estructurado de la propuesta para el cliente
-    tabla_final_items = []
-    if venta_equipos > 0:
-        tabla_final_items.append({"Descripción del Rubro": "Suministro de Equipos de Seguridad", "Monto ($)": venta_equipos})
-    if venta_materiales > 0:
-        tabla_final_items.append({"Descripción del Rubro": "Materiales e Insumos de Canalización", "Monto ($)": venta_materiales})
-    
-    # Inyección de las filas de servicios desglosados desde la pestaña 3
-    for s in lista_mo:
-        tabla_final_items.append({
-            "Descripción del Rubro": s["Descripción"],
-            "Monto ($)": s["Precio Venta Total ($)"]
-        })
-    
-    if tabla_final_items:
-        st.table(pd.DataFrame(tabla_final_items))
+    # Indicador de cumplimiento de meta
+    if rentabilidad_real_pct >= rent_objetivo:
+        col_rent3.success("✅ ¡Meta de rentabilidad alcanzada o superada!")
     else:
-        st.warning("No hay rubros cargados todavía en la cotización.")
+        col_rent3.warning("⚠️ La rentabilidad actual está por debajo del objetivo.")
+        
+    st.markdown("---")
     
-    col_f1, col_f2 = st.columns(2)
-    col_f1.markdown(f"""
-    * **Términos de Pago:** {pago}
-    * **Validez de Oferta:** {validez}
-    """)
-    col_f2.markdown(f"""
-    * **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}
-    * **IVA (13%):** ${iva_calc:,.2f}
-    * **TOTAL NETO:** **${total_general_cliente:,.2f}**
-    """)
+    # PANEL VISUAL: TABLA DE CARA AL CLIENTE Y GRÁFICO DE TORTA EN PARALELO
+    col_izq_res, col_der_res = st.columns([4, 3])
+    
+    with col_izq_res:
+        st.markdown("#### 🔒 Panel Privado de Costos e Ingresos")
+        c_liq1, c_liq2, c_liq3 = st.columns(3)
+        c_liq1.metric("Costo Total Interno", f"${costo_total_proyecto:,.2f}")
+        c_liq2.metric("Precio Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
+        c_liq3.metric("Utilidad Total Retenida", f"${utilidad_total:,.2f}")
+        
+        st.markdown(" ")
+        st.markdown(f"#### 📄 Propuesta Comercial de cara al Cliente")
+        st.caption(f"**Proyecto:** {proyecto} | **Empresa:** {empresa} | **Atención:** {atencion}")
+        
+        tabla_final_items = []
+        if venta_equipos > 0:
+            tabla_final_items.append({"Descripción del Rubro": "Suministro de Equipos de Seguridad", "Monto ($)": venta_equipos})
+        if venta_materiales > 0:
+            tabla_final_items.append({"Descripción del Rubro": "Materiales e Insumos de Canalización", "Monto ($)": venta_materiales})
+        
+        for s in lista_mo:
+            tabla_final_items.append({
+                "Descripción del Rubro": s["Descripción"],
+                "Monto ($)": s["Precio Venta Total ($)"]
+            })
+        
+        if tabla_final_items:
+            st.table(pd.DataFrame(tabla_final_items))
+        else:
+            st.warning("No hay rubros cargados todavía en la cotización.")
+            
+        col_f1, col_f2 = st.columns(2)
+        col_f1.markdown(f"* **Términos de Pago:** {pago}\n* **Validez de Oferta:** {validez}")
+        col_f2.markdown(f"* **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}\n* **IVA (13%):** ${iva_calc:,.2f}\n* **TOTAL NETO:** **${total_general_cliente:,.2f}**")
+
+    with col_der_res:
+        st.markdown("#### 📊 Distribución de la Utilidad Retenida")
+        
+        # Validación de datos para el gráfico
+        if utilidad_total > 0:
+            data_grafico = {
+                "Sección": ["Equipos Principales", "Materiales e Insumos", "Mano de Obra y Logística"],
+                "Utilidad ($)": [max(0.0, utilidad_equipos), max(0.0, utilidad_materiales), max(0.0, utilidad_mo)],
+                "Venta Total ($)": [venta_equipos, venta_materiales, venta_mo_tot]
+            }
+            df_grafico = pd.DataFrame(data_grafico)
+            
+            # Generación del gráfico de pie dinámico con Plotley
+            fig = px.pie(
+                df_grafico, 
+                values="Utilidad ($)", 
+                names="Sección",
+                title="¿Qué sección genera más rentabilidad? (Monto en $ de Utilidad)",
+                hole=0.3,
+                hover_data=["Venta Total ($)"],
+                labels={"Utilidad ($)": "Utilidad"}
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+value', labelssource="Sección")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Agrega equipos o servicios con rentabilidad en las pestañas anteriores para proyectar el gráfico de pastel.")
