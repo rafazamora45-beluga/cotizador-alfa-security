@@ -38,7 +38,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # --- PESTAÑA 1: EQUIPOS PRINCIPALES (INGRESO MANUAL) ---
 with tab1:
-    st.subheader("Componentes y Equipos de Seguridad Electronica")
+    st.subheader("Componentes y Equipos de Seguridad Electrónica")
     st.info("Ingresa manualmente los equipos principales de distribuidores (Paneles, Sensores, Cámaras, etc.)")
     
     with st.form("form_equipos"):
@@ -66,13 +66,13 @@ with tab1:
         if st.button("Limpiar Equipos", key="btn_clear_eq"):
             st.session_state.equipos = []
             try:
-                st.sidebar.empty()
+                st.rerun()
             except:
                 pass
 
 # --- PESTAÑA 2: BUSCADOR EN VIVO (FREUND) ---
 with tab2:
-    st.subheader("Conexión en Vivo con Freund Ferreteria")
+    st.subheader("Conexión en Vivo con Freund Ferretería")
     st.markdown("Busca tuberías EMT, cajas, cables o abrazaderas en tiempo real en El Salvador.")
     
     buscar_termino = st.text_input("¿Qué material necesitas buscar?", placeholder="Ej. tuberia emt")
@@ -148,7 +148,7 @@ with tab3:
         if st.button("Limpiar Mano de Obra", key="btn_clear_mo"):
             st.session_state.mano_obra = []
             try:
-                st.sidebar.empty()
+                st.rerun()
             except:
                 pass
 
