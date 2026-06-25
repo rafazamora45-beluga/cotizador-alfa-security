@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from fpdf import FPDF
+import os
 
 # 1. INICIALIZACIÓN DE VARIABLES GLOBALES EN SESIÓN
 if "equipos" not in st.session_state:
@@ -17,7 +18,17 @@ st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="w
 st.title("🛡️ Sistema de Cotizaciones Automáticas — Alfa Security")
 st.markdown("---")
 
-# 2. PANEL IZQUIERDO: DATOS DEL PROYECTO
+# 2. PANEL IZQUIERDO: LOGO Y DATOS DEL PROYECTO
+# Insertamos el logo en la parte superior de la barra lateral
+ruta_logo = "LOGO_ALFA-02.png"
+if os.path.exists(ruta_logo):
+    st.sidebar.image(ruta_logo, use_container_width=True)
+else:
+    # Intento alternativo por si en GitHub se guardó en minúsculas
+    ruta_logo_min = "logo_alfa-02.png"
+    if os.path.exists(ruta_logo_min):
+        st.sidebar.image(ruta_logo_min, use_container_width=True)
+
 st.sidebar.header("📋 Datos del Proyecto")
 proyecto = st.sidebar.text_input("Nombre del Proyecto", "Proyecto Procaps El Salvador")
 empresa = st.sidebar.text_input("Empresa", "Alfa Security")
@@ -404,7 +415,7 @@ with tab4:
         col_f1.markdown(f"* **Términos de Pago:** {pago}\n* **Validez de Oferta:** {validez}")
         col_f2.markdown(f"* **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}\n* **IVA (13%):** ${iva_calc:,.2f}\n* **TOTAL NETO:** **${total_general_cliente:,.2f}**")
 
-        # --- SECCIÓN DE GENERACIÓN DE PDF CORREGIDA PARA FPDF2 ---
+        # --- SECCIÓN DE GENERACIÓN DE PDF ---
         def generar_pdf():
             pdf = FPDF()
             pdf.add_page()
@@ -448,53 +459,3 @@ with tab4:
                 pdf.set_font("Helvetica", "", 10)
                 pdf.cell(140, 6, txt="Mano de Obra (Servicios técnicos, logística, certificaciones y herramientas)", border=1)
                 pdf.cell(50, 6, txt=f"${venta_mo_tot:.2f}", border=1, ln=True, align="R")
-                
-            # 3. Bloque Materiales y Suministros
-            if venta_materiales > 0:
-                pdf.set_font("Helvetica", "", 10)
-                pdf.cell(140, 6, txt="Materiales y Suministros", border=1)
-                pdf.cell(50, 6, txt=f"${venta_materiales:.2f}", border=1, ln=True, align="R")
-                
-            pdf.ln(6)
-            
-            # Cierre Totales
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(140, 6, txt="SUBTOTAL", align="R")
-            pdf.cell(50, 6, txt=f"${subtotal_venta_proyecto:.2f}", border=1, ln=True, align="R")
-            
-            pdf.cell(140, 6, txt="IVA (13%)" if aplicar_iva else "IVA (0%)", align="R")
-            pdf.cell(50, 6, txt=f"${iva_calc:.2f}", border=1, ln=True, align="R")
-            
-            pdf.cell(140, 6, txt="TOTAL NETO", align="R")
-            pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(50, 6, txt=f"${total_general_cliente:.2f}", border=1, ln=True, align="R")
-            
-            # En fpdf2, llamar a output() sin parámetros devuelve directamente el bytearray
-            return pdf.output()
-
-        # Botón de Descarga
-        if tabla_final_items:
-            try:
-                pdf_bytes = generar_pdf()
-                st.download_button(
-                    label="📥 Descargar Cotización en PDF",
-                    data=bytes(pdf_bytes),  # fpdf2 ya genera bytes nativos
-                    file_name=f"Cotizacion_{proyecto.replace(' ', '_')}.pdf",
-                    mime="application/pdf"
-                )
-            except Exception as e:
-                st.error(f"Error generando el PDF: {e}")
-
-    with col_der_res:
-        st.markdown("#### 📊 Distribución de la Utilidad Retenida")
-        # Corrección para que Plotly no falle si la utilidad acumulada es 0 o vacía
-        if utilidad_total > 0:
-            data_grafico = {
-                "Sección": ["Equipos Principales", "Materiales e Insumos", "Mano de Obra"],
-                "Utilidad ($)": [max(0.0, utilidad_equipos), max(0.0, utilidad_materiales), max(0.0, utilidad_mo)]
-            }
-            df_grafico = pd.DataFrame(data_grafico)
-            fig = px.pie(df_grafico, values="Utilidad ($)", names="Sección", hole=0.3)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Agrega componentes con margen de ganancia para visualizar la gráfica de utilidades.")
