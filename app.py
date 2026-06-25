@@ -7,21 +7,9 @@ if "equipos" not in st.session_state:
 if "materiales" not in st.session_state:
     st.session_state["materiales"] = []
 
-# Inicialización segura del bloque de Mano de Obra
-if "mano_obra_bloque" not in st.session_state:
-    st.session_state["mano_obra_bloque"] = {
-        "Costo Interno": 0.0,
-        "Rentabilidad Aplicada (%)": 20.0,
-        "Detalle": {
-            "Servicio de Configuración Especializada": 0.0,
-            "Servicio de Técnico Instalador": 0.0,
-            "Logística de Estadía fuera de San Salvador": 0.0,
-            "Viáticos de Alimentación y Campo": 0.0,
-            "Soporte de Técnico Outsourcing": 0.0,
-            "Servicio Técnico Nocturno / Fin de Semana": 0.0,
-            "Movilización y Combustible del Proyecto": 0.0
-        }
-    }
+# Inicialización de la lista de servicios dinámicos para Mano de Obra
+if "servicios_mo" not in st.session_state:
+    st.session_state["servicios_mo"] = []
 
 # Configuración de la página y diseño visual
 st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="wide")
@@ -111,7 +99,7 @@ with tab1:
         st.markdown(" ")
         col_btn1, col_btn2 = st.columns([3, 10])
         
-        if col_btn1.button("🗑️ Aplicar Eliminación de Marcados"):
+        if col_btn1.button("🗑️ Aplicar Eliminación de Marcados", key="del_eq"):
             st.session_state["equipos"] = [eq for eq in st.session_state["equipos"] if not eq["Borrar"]]
             st.success("Equipos eliminados correctamente.")
             st.rerun()
@@ -154,16 +142,16 @@ with tab2:
                     })
                     st.success("Agregado al costeo.")
 
-# --- PESTAÑA 3: MANO DE OBRA ---
+# --- PESTAÑA 3: MANO DE OBRA (CON TABLA INTERACTIVA INTEGRAL) ---
 with tab3:
     st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
-    st.info("Configura los costos operativos globales. El bloque técnico calcula por defecto una rentabilidad del 20% editable.")
+    st.info("Configura los costos operativos globales. Al presionar 'Agregar al Balance', el servicio se sumará a la tabla interactiva inferior.")
 
     col_izq, col_der = st.columns([1, 1])
 
     with col_izq:
         st.markdown("#### ⚙️ 1. Personal Técnico y Logística")
-        rent_mo = st.number_input("Rentabilidad Comercial del Bloque (%)", min_value=0.0, max_value=99.0, value=20.0, step=5.0, key="rent_mo_p3")
+        rent_mo = st.number_input("Rentabilidad Comercial por Defecto (%)", min_value=0.0, max_value=99.0, value=20.0, step=5.0, key="rent_mo_p3")
 
         with st.form("form_mano_obra_completo"):
             st.markdown("**Carga de Personal:**")
@@ -204,33 +192,44 @@ with tab3:
             kms_proyecto = col_km1.number_input("Kilómetros totales a recorrer (KM)", min_value=0.0, value=0.0)
             costo_por_km = col_km2.number_input("Precio / Costo por Kilómetro ($)", min_value=0.0, value=0.36, step=0.05, format="%.2f")
             
-            btn_guardar_mo = st.form_submit_button("Guardar Bloque Operativo")
+            btn_guardar_mo = st.form_submit_button("Agregar al Balance Operativo")
 
             if btn_guardar_mo:
-                c_conf_tot = float(cant_conf * dias_conf * tarifa_conf)
-                c_inst_tot = float(cant_inst * dias_inst * tarifa_inst)
-                c_est_tot = float(dias_estadia * costo_estadia)
-                c_via_tot = float(dias_viaticos * costo_viaticos)
-                c_out_tot = float(dias_out * costo_out)
-                c_noc_tot = float(dias_noc * costo_noc)
-                c_comb_tot = float(kms_proyecto * costo_por_km)
+                # Mapeo de cálculos individuales
+                servicios_nuevos = [
+                    ("Servicio de Configuración Especializada", cant_conf * dias_conf, tarifa_conf),
+                    ("Servicio de Técnico Instalador", cant_inst * dias_inst, tarifa_inst),
+                    ("Logística de Estadía fuera de San Salvador", dias_estadia, costo_estadia),
+                    ("Viáticos de Alimentación y Campo", dias_viaticos, costo_viaticos),
+                    ("Soporte de Técnico Outsourcing", dias_out, costo_out),
+                    ("Servicio Técnico Nocturno / Fin de Semana", dias_noc, costo_noc),
+                    ("Movilización y Combustible del Proyecto", kms_proyecto, costo_por_km)
+                ]
                 
-                costo_operativo_total = c_conf_tot + c_inst_tot + c_est_tot + c_via_tot + c_out_tot + c_noc_tot + c_comb_tot
+                guardado = False
+                for nombre, cant, costo_u in servicios_nuevos:
+                    if cant > 0 and costo_u > 0:
+                        costo_tot = float(cant * costo_u)
+                        margen = rent_mo / 100.0
+                        precio_v_u = costo_u / (1 - margen) if margen < 1 else costo_u
+                        
+                        st.session_state["servicios_mo"].append({
+                            "Borrar": False,
+                            "Descripción": nombre,
+                            "Cantidad": float(cant),
+                            "Costo Unitario ($)": float(costo_u),
+                            "Costo Interno ($)": float(costo_tot),
+                            "Rentabilidad (%)": float(rent_mo),
+                            "Costo del Cliente U ($)": float(precio_v_u),
+                            "Precio Venta Total ($)": float(precio_v_u * cant)
+                        })
+                        guardado = True
                 
-                st.session_state["mano_obra_bloque"] = {
-                    "Costo Interno": costo_operativo_total,
-                    "Rentabilidad Aplicada (%)": rent_mo,
-                    "Detalle": {
-                        "Servicio de Configuración Especializada": c_conf_tot,
-                        "Servicio de Técnico Instalador": c_inst_tot,
-                        "Logística de Estadía fuera de San Salvador": c_est_tot,
-                        "Viáticos de Alimentación y Campo": c_via_tot,
-                        "Soporte de Técnico Outsourcing": c_out_tot,
-                        "Servicio Técnico Nocturno / Fin de Semana": c_noc_tot,
-                        "Movilización y Combustible del Proyecto": c_comb_tot
-                    }
-                }
-                st.success("¡Costos calculados y retenidos!")
+                if guardado:
+                    st.success("¡Servicios inyectados a la tabla de balance exitosamente!")
+                    st.rerun()
+                else:
+                    st.warning("No ingresaste cantidades válidas mayores a cero.")
 
     with col_der:
         st.markdown("#### 🔧 2. Certificaciones y Herramientas Especiales")
@@ -240,55 +239,139 @@ with tab3:
             btn_add_h = st.form_submit_button("Agregar Herramienta")
             
             if btn_add_h and c_desc:
-                st.session_state["materiales"].append({
+                st.session_state["servicios_mo"].append({
                     "Borrar": False,
                     "Descripción": f"[HERRAMIENTA] {c_desc}",
-                    "Cantidad": 1,
+                    "Cantidad": 1.0,
                     "Costo Unitario ($)": float(c_monto),
-                    "Costo Total ($)": float(c_monto),
+                    "Costo Interno ($)": float(c_monto),
                     "Rentabilidad (%)": 0.0,
-                    "Precio Venta U ($)": float(c_monto),
+                    "Costo del Cliente U ($)": float(c_monto),
                     "Precio Venta Total ($)": float(c_monto)
                 })
-                st.success("Agregado al proyecto.")
-
-        items_h = [x for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]")]
-        if items_h:
-            st.dataframe(pd.DataFrame(items_h)[["Descripción", "Costo Total ($)"]], hide_index=True, use_container_width=True)
-            if st.button("Limpiar Herramientas"):
-                st.session_state["materiales"] = [x for x in st.session_state["materiales"] if not x["Descripción"].startswith("[HERRAMIENTA]")]
+                st.success("Herramienta agregada a la tabla de balance.")
                 st.rerun()
 
-    # Cálculo dinámico de totales para la pestaña
-    mo_datos = st.session_state["mano_obra_bloque"]
-    costo_interno_personal = mo_datos["Costo Interno"]
-    rent_actual_pct = mo_datos["Rentabilidad Aplicada (%)"] / 100.0
-    precio_cliente_personal = costo_interno_personal / (1 - rent_actual_pct) if rent_actual_pct < 1 else costo_interno_personal
-    total_herramientas = sum(x["Costo Total ($)"] for x in st.session_state["materiales"] if x["Descripción"].startswith("[HERRAMIENTA]"))
-    
-    gran_costo_interno_mo = costo_interno_personal + total_herramientas
-    gran_precio_cliente_mo = precio_cliente_personal + total_herramientas
-
+    # --- TABLA INTERACTIVA DE BALANCE DE COSTOS ---
     st.markdown("---")
-    st.markdown("### 📊 Balance de Costo de Operación de Mano de Obra")
-    cb1, cb2 = st.columns(2)
-    cb1.metric("A MÍ ME CUESTA (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
-    cb2.metric("AL CLIENTE LE CUESTA (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
+    st.markdown("### 📊 Balance del Costo de Operación y Logística")
+    
+    if st.session_state["servicios_mo"]:
+        df_mo_original = pd.DataFrame(st.session_state["servicios_mo"])
+        
+        # Data editor interactivo para modificar Rentabilidades y Cantidades al vuelo
+        df_mo_editado = st.data_editor(
+            df_mo_original,
+            hide_index=True,
+            use_container_width=True,
+            disabled=["Descripción", "Costo Unitario ($)", "Costo Interno ($)", "Costo del Cliente U ($)", "Precio Venta Total ($)"],
+            column_config={
+                "Borrar": st.column_config.CheckboxColumn("Seleccionar para Borrar", default=False),
+                "Cantidad": st.column_config.NumberColumn("Cantidad / Factor", min_value=0.0, step=0.5, format="%.2f"),
+                "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99, step=1),
+                "Costo Unitario ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Costo Interno ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Costo del Cliente U ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Precio Venta Total ($)": st.column_config.NumberColumn(format="$%.2f"),
+            }
+        )
+        
+        # Recálculos automáticos basados en la interacción del usuario en la tabla
+        for i in range(len(df_mo_editado)):
+            r_pct = df_mo_editado.at[i, "Rentabilidad (%)"] / 100.0
+            c_uni = df_mo_editado.at[i, "Costo Unitario ($)"]
+            cant = df_mo_editado.at[i, "Cantidad"]
+            
+            df_mo_editado.at[i, "Costo Interno ($)"] = c_uni * cant
+            p_venta_u = c_uni / (1 - r_pct) if r_pct < 1 else c_uni
+            df_mo_editado.at[i, "Costo del Cliente U ($)"] = p_venta_u
+            df_mo_editado.at[i, "Precio Venta Total ($)"] = p_venta_u * cant
+
+        st.session_state["servicios_mo"] = df_mo_editado.to_dict(orient="records")
+        
+        # Acciones para borrar agregados
+        col_mo_b1, col_mo_b2 = st.columns([3, 10])
+        if col_mo_b1.button("🗑️ Eliminar Servicios Seleccionados", key="del_mo_sel"):
+            st.session_state["servicios_mo"] = [s for s in st.session_state["servicios_mo"] if not s["Borrar"]]
+            st.success("Items operativos eliminados.")
+            st.rerun()
+            
+        if col_mo_b2.button("Limpiar Tabla de Balance Completa", key="clear_mo_all"):
+            st.session_state["servicios_mo"] = []
+            st.rerun()
+            
+        # Métricas Globales de Mano de Obra en tiempo real
+        gran_costo_interno_mo = sum(x["Costo Interno ($)"] for x in st.session_state["servicios_mo"])
+        gran_precio_cliente_mo = sum(x["Precio Venta Total ($)"] for x in st.session_state["servicios_mo"])
+        
+        st.markdown(" ")
+        cb1, cb2 = st.columns(2)
+        cb1.metric("A MÍ ME CUESTA TOTAL (Costo Interno)", f"${gran_costo_interno_mo:,.2f}")
+        cb2.metric("AL CLIENTE LE CUESTA TOTAL (Precio Venta)", f"${gran_precio_cliente_mo:,.2f}")
+    else:
+        st.warning("No hay registros en la tabla de balance de operación.")
 
 # --- PESTAÑA 4: RESUMEN COMERCIAL Y LIQUIDACIÓN ---
 with tab4:
     st.subheader("📊 Resumen General de Cotización y Liquidación")
     
     lista_eq = st.session_state.get("equipos", [])
-    lista_mat = [x for x in st.session_state.get("materiales", []) if not x["Descripción"].startswith("[HERRAMIENTA]")]
-    items_herramientas = [x for x in st.session_state.get("materiales", []) if x["Descripción"].startswith("[HERRAMIENTA]")]
+    lista_mat = st.session_state.get("materiales", [])
+    lista_mo = st.session_state.get("servicios_mo", [])
     
+    # Cálculos dinámicos finales leyendo de las respectivas tablas
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     
     costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
     
-    # Procesamiento del desglose de servicios individuales
-    mo_datos_global = st.session_state["mano_obra_bloque"]
-    rent_mo_pct = mo_datos_global["Rentabilidad Aplicada (%)"] / 100.0
+    costo_mo_tot = sum(x.get("Costo Interno ($)", 0.0) for x in lista_mo)
+    venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
+    
+    # Totales absolutos
+    costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
+    subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
+    
+    iva_calc = subtotal_venta_proyecto * 0.13
+    total_general_cliente = subtotal_venta_proyecto + iva_calc
+    
+    st.markdown("#### 🔒 Panel Privado Alfa Security")
+    c_liq1, c_liq2, c_liq3 = st.columns(3)
+    c_liq1.metric("Costo Total Operativo Interno", f"${costo_total_proyecto:,.2f}")
+    c_liq2.metric("Precio de Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
+    c_liq3.metric("Utilidad Total Retenida", f"${(subtotal_venta_proyecto - costo_total_proyecto):,.2f}")
+    
+    st.markdown("---")
+    st.markdown("#### 📄 Datos de cara al Cliente para la Propuesta")
+    st.write(f"**Proyecto:** {proyecto} | **Empresa:** {empresa} | **Atención:** {atencion}")
+    
+    # Armado estructurado de la propuesta para el cliente
+    tabla_final_items = []
+    if venta_equipos > 0:
+        tabla_final_items.append({"Descripción del Rubro": "Suministro de Equipos de Seguridad", "Monto ($)": venta_equipos})
+    if venta_materiales > 0:
+        tabla_final_items.append({"Descripción del Rubro": "Materiales e Insumos de Canalización", "Monto ($)": venta_materiales})
+    
+    # Inyección de las filas de servicios desglosados desde la pestaña 3
+    for s in lista_mo:
+        tabla_final_items.append({
+            "Descripción del Rubro": s["Descripción"],
+            "Monto ($)": s["Precio Venta Total ($)"]
+        })
+    
+    if tabla_final_items:
+        st.table(pd.DataFrame(tabla_final_items))
+    else:
+        st.warning("No hay rubros cargados todavía en la cotización.")
+    
+    col_f1, col_f2 = st.columns(2)
+    col_f1.markdown(f"""
+    * **Términos de Pago:** {pago}
+    * **Validez de Oferta:** {validez}
+    """)
+    col_f2.markdown(f"""
+    * **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}
+    * **IVA (13%):** ${iva_calc:,.2f}
+    * **TOTAL NETO:** **${total_general_cliente:,.2f}**
+    """)
