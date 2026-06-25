@@ -1,24 +1,23 @@
 import streamlit as st
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
+
+# 1. INICIALIZACIÓN ABSOLUTA DEL ESTADO DE LA SESIÓN
+# Esto asegura que las variables existan desde el milisegundo uno en memoria
+if "equipos" not in st.session_state:
+    st.session_state["equipos"] = []
+if "materiales" not in st.session_state:
+    st.session_state["materiales"] = []
+if "mano_obra" not in st.session_state:
+    st.session_state["mano_obra"] = []
 
 # Configuración de la página y diseño visual estilizado para Alfa Security
 st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="wide")
-
-# Inicializar estados de la aplicación para guardar datos en la sesión activa
-if "equipos" not in st.session_state:
-    st.session_state.equipos = []
-if "materiales" not in st.session_state:
-    st.session_state.materiales = []
-if "mano_obra" not in st.session_state:
-    st.session_state.mano_obra = []
 
 # Título y Encabezado Corporativo
 st.title("🛡️ Sistema de Cotizaciones Automáticas — Alfa Security")
 st.markdown("---")
 
-# 1. INFORMACIÓN DEL PROYECTO (Panel Izquierdo)
+# 2. INFORMACIÓN DEL PROYECTO (Panel Izquierdo)
 st.sidebar.header("📋 Datos del Proyecto")
 cliente = st.sidebar.text_input("Nombre del Cliente / Proyecto", "Procaps El Salvador")
 atencion = st.sidebar.text_input("Atención a:", "Ing. Miguel Melendez")
@@ -50,7 +49,7 @@ with tab1:
         
         if btn_eq and desc_eq:
             precio_venta_u = costo_eq / (1 - MARGEN)
-            st.session_state.equipos.append({
+            st.session_state["equipos"].append({
                 "Descripción": desc_eq,
                 "Cantidad": cant_eq,
                 "Costo Unitario": costo_eq,
@@ -60,11 +59,11 @@ with tab1:
             })
             st.success(f"Agregado: {desc_eq}")
 
-    if st.session_state.equipos:
-        df_eq = pd.DataFrame(st.session_state.equipos)
+    if st.session_state["equipos"]:
+        df_eq = pd.DataFrame(st.session_state["equipos"])
         st.dataframe(df_eq.style.format({"Costo Unitario": "${:.2f}", "Costo Total": "${:.2f}", "Precio Venta U": "${:.2f}", "Precio Venta Total": "${:.2f}"}))
         if st.button("Limpiar Equipos", key="btn_clear_eq"):
-            st.session_state.equipos = []
+            st.session_state["equipos"] = []
             try:
                 st.rerun()
             except:
@@ -80,7 +79,7 @@ with tab2:
     if buscar_termino:
         st.write(f"Buscando '{buscar_termino}'...")
         
-        # Base de datos optimizada y corregida al 100% libre de errores de sintaxis
+        # Base de datos optimizada libre de errores
         materiales_respaldo = [
             {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 3/4 PLG (6MT)", "price": 4.25},
             {"sku": "24847137", "name": "UNION EMT PRESION 3/4 PLG", "price": 0.95},
@@ -91,7 +90,6 @@ with tab2:
             {"sku": "fw_1", "name": "CABLE FPLR 2X14 AWG CONTRA INCENDIO (PIE)", "price": 0.38}
         ]
         
-        # Filtrar localmente coincidencias por texto
         coincidencias = [m for m in materiales_respaldo if buscar_termino.lower() in m["name"].lower()]
         
         if coincidencias:
@@ -104,7 +102,7 @@ with tab2:
                 cant_m = col_accion.number_input(f"Cantidad a añadir", min_value=1, value=1, step=1, key=f"cant_{m['sku']}")
                 if col_accion.button(f"Agregar al Costeo", key=f"btn_{m['sku']}"):
                     precio_v_mat = m['price'] / (1 - MARGEN)
-                    st.session_state.materiales.append({
+                    st.session_state["materiales"].append({
                         "Descripción": m['name'],
                         "Cantidad": cant_m,
                         "Costo Unitario": m['price'],
@@ -132,7 +130,7 @@ with tab3:
         if btn_obra and rol:
             costo_mo_total = personal * dias * tarifa
             precio_mo_venta = costo_mo_total / (1 - MARGEN)
-            st.session_state.mano_obra.append({
+            st.session_state["mano_obra"].append({
                 "Rol": rol,
                 "Personal": personal,
                 "Días": dias,
@@ -142,11 +140,11 @@ with tab3:
             })
             st.success(f"Mano de obra para {rol} cargada.")
 
-    if st.session_state.mano_obra:
-        df_mo = pd.DataFrame(st.session_state.mano_obra)
+    if st.session_state["mano_obra"]:
+        df_mo = pd.DataFrame(st.session_state["mano_obra"])
         st.dataframe(df_mo.style.format({"Costo Diario": "${:.2f}", "Costo Total": "${:.2f}", "Precio Venta Total": "${:.2f}"}))
         if st.button("Limpiar Mano de Obra", key="btn_clear_mo"):
-            st.session_state.mano_obra = []
+            st.session_state["mano_obra"] = []
             try:
                 st.rerun()
             except:
@@ -156,29 +154,34 @@ with tab3:
 with tab4:
     st.subheader("💸 Liquidación Final del Proyecto")
     
-    # Cálculos Financieros Consolidados
-    costo_equipos = sum(x["Costo Total"] for x in st.session_state.equipos)
-    venta_equipos = sum(x["Precio Venta Total"] for x in st.session_state.equipos)
+    # Uso seguro de .get() para evitar KeyErrors si Streamlit limpia la memoria de la sesión
+    lista_equipos = st.session_state.get("equipos", [])
+    lista_materiales = st.session_state.get("materiales", [])
+    lista_mano_obra = st.session_state.get("mano_obra", [])
     
-    costo_materiales = sum(x["Costo Total"] for x in st.session_state.materiales)
-    venta_materiales = sum(x["Precio Venta Total"] for x in st.session_state.materiales)
+    # Cálculos Financieros Consolidados con validación segura
+    costo_equipos = sum(x.get("Costo Total", 0.0) for x in lista_equipos)
+    venta_equipos = sum(x.get("Precio Venta Total", 0.0) for x in lista_equipos)
     
-    costo_mo = sum(x["Costo Total"] for x in st.session_state.mano_obra)
-    venta_mo = sum(x["Precio Venta Total"] for x in st.session_state.mano_obra)
+    costo_materiales = sum(x.get("Costo Total", 0.0) for x in lista_materiales)
+    venta_materiales = sum(x.get("Precio Venta Total", 0.0) for x in lista_materiales)
+    
+    costo_mo = sum(x.get("Costo Total", 0.0) for x in lista_mano_obra)
+    venta_mo = sum(x.get("Precio Venta Total", 0.0) for x in lista_mano_obra)
     
     costo_proyecto_total = costo_equipos + costo_materiales + costo_mo
     venta_proyecto_total = venta_equipos + venta_materiales + venta_mo
     
     utilidad_neta = venta_proyecto_total - costo_proyecto_total
     
-    # Control de división por cero si la cotización está vacía
+    # Control de división por cero si la cotización arranca vacía
     margen_real = (utilidad_neta / venta_proyecto_total) * 100 if venta_proyecto_total > 0 else 0.0
     
-    # Impuestos locales de El Salvador (IVA 13%)
+    # Impuestos de El Salvador (IVA 13%)
     iva = venta_proyecto_total * 0.13
     gran_total = venta_proyecto_total + iva
     
-    # PANTALLA DE KPI FINANCIEROS (CON MARGEN ASEGURADO DEL 40%)
+    # Renderizado seguro de KPI Financieros
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Costo Total Alfa Security", f"${costo_proyecto_total:,.2f}")
     c2.metric("Precio de Venta (Subtotal)", f"${venta_proyecto_total:,.2f}")
