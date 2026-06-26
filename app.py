@@ -1,4 +1,3 @@
-       """
 freund_scraper.py
 Motor de búsqueda para Ferretería Freund El Salvador
 - Web scraping real con múltiples estrategias
