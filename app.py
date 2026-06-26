@@ -16,6 +16,8 @@ if "materiales" not in st.session_state:
     st.session_state["materiales"] = []
 if "servicios_mo" not in st.session_state:
     st.session_state["servicios_mo"] = []
+if "imprevistos_materiales" not in st.session_state:
+    st.session_state["imprevistos_materiales"] = 0.0
 
 st.title("🛡️ Sistema de Cotizaciones Automáticas — Alfa Security")
 st.markdown("---")
@@ -161,10 +163,10 @@ atencion = st.sidebar.text_input("Atención a:", "Rafael Zamora")
 validez = st.sidebar.text_input("Validez de la Oferta", "20 días")
 pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraentrega")
 
-# Pestañas de Navegación
+# Pestañas de Navegación (Pestaña 2 renombrada a Materiales)
 tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
-    "🔍 Buscador Freund (Materiales)", 
+    "🧰 Materiales", 
     "🛠️ Mano de Obra", 
     "📊 Resumen Comercial"
 ])
@@ -252,27 +254,63 @@ with tab1:
             st.rerun()
 
 # ==========================================
-# --- PESTAÑA 2: BUSCADOR FREUND ---
+# --- PESTAÑA 2: MATERIALES (MODIFICADA) ---
 # ==========================================
 with tab2:
-    st.subheader("🔍 Extractor de Catálogo — Ferretería Freund El Salvador")
-    st.caption("Filtra por departamento e ingresa palabras clave del material.")
+    st.subheader("🧰 Gestión Integral de Materiales y Suministros")
     
-    col_dep, col_text = st.columns([2, 3])
-    dept_seleccionado = col_dep.selectbox("Seleccionar Departamento Técnico", list(DEPARTAMENTOS_FREUND.keys()))
-    buscar_termino = col_text.text_input("¿Qué buscas? (Muestra todos los elementos que incluyan este término)", placeholder="Ej. tecno-ducto, emt, tubo...")
+    # SECCIÓN DE IMPREVISTOS (Requerimiento 2)
+    st.markdown("#### ⚠️ Carga de Imprevistos en Materiales")
+    st.session_state["imprevistos_materiales"] = st.number_input(
+        "Monto de Imprevistos ($) — *Va directo al costo, sin generar rentabilidad*", 
+        min_value=0.0, 
+        value=st.session_state["imprevistos_materiales"], 
+        step=10.0
+    )
+    st.markdown("---")
     
-    url_final = DEPARTAMENTOS_FREUND[dept_seleccionado]
+    # DOS OPCIONES DE CARGA: BUSCADOR FREUND Y CARGA MANUAL (Requerimiento 3)
+    col_opc1, col_opc2 = st.columns(2)
     
-    if st.button("🚀 Buscar Insumos en Freund"):
-        st.session_state["coincidencias_busqueda"] = buscar_en_freund(url_final, buscar_termino)
-        if not st.session_state["coincidencias_busqueda"]:
-            st.warning("No se encontraron coincidencias para esa búsqueda en este departamento.")
+    with col_opc1:
+        st.markdown("#### 🔍 Extractor de Catálogo — Ferretería Freund El Salvador")
+        col_dep, col_text = st.columns([1, 1])
+        dept_seleccionado = col_dep.selectbox("Seleccionar Departamento Técnico", list(DEPARTAMENTOS_FREUND.keys()))
+        buscar_termino = col_text.text_input("¿Qué buscas?", placeholder="Ej. tecno-ducto, emt, tubo...", key="txt_b_freund")
+        
+        url_final = DEPARTAMENTOS_FREUND[dept_seleccionado]
+        
+        if st.button("🚀 Buscar Insumos en Freund"):
+            st.session_state["coincidencias_busqueda"] = buscar_en_freund(url_final, buscar_termino)
+            if not st.session_state["coincidencias_busqueda"]:
+                st.warning("No se encontraron coincidencias para esa búsqueda en este departamento.")
+                
+    with col_opc2:
+        st.markdown("#### ✍️ Agregar Material Manualmente (Rentabilidad fija 40%)")
+        with st.form("form_material_manual"):
+            m_desc = st.text_input("Descripción del Material", placeholder="Ej. Abrazadera Conduit de 3/4")
+            m_cant = st.number_input("Cantidad", min_value=1, value=1, step=1)
+            m_costo = st.number_input("Precio Costo Unitario ($)", min_value=0.0, value=0.0, step=1.0)
+            btn_manual = st.form_submit_button("➕ Agregar Manualmente")
+            
+            if btn_manual and m_desc:
+                p_v_manual = m_costo / (1 - 0.40)
+                st.session_state["materiales"].append({
+                    "Borrar": False,
+                    "Descripción": m_desc.upper(),
+                    "Cantidad": int(m_cant),
+                    "Costo Unitario ($)": float(m_costo),
+                    "Costo Total ($)": float(m_costo * m_cant),
+                    "Rentabilidad (%)": 40.0,
+                    "Precio Venta U ($)": float(p_v_manual),
+                    "Precio Venta Total ($)": float(p_v_manual * m_cant)
+                })
+                st.toast(f"✅ Cargado manualmente: {m_desc.upper()}")
 
+    # Despliegue de Resultados del Buscador Freund
     if "coincidencias_busqueda" in st.session_state and st.session_state["coincidencias_busqueda"]:
         coincidencias = st.session_state["coincidencias_busqueda"]
-        st.markdown(f"#### 📊 Materiales encontrados ({len(coincidencias)})")
-        st.markdown("---")
+        st.markdown(f"##### 📊 Materiales encontrados en Freund ({len(coincidencias)})")
         
         for i, m in enumerate(coincidencias):
             with st.container():
@@ -323,32 +361,49 @@ with tab2:
                 
                 st.markdown("<div style='margin-top: 10px; margin-bottom: 10px; border-bottom: 1px solid #2d3139;'></div>", unsafe_allow_html=True)
 
-    if st.session_state["materiales"]:
+    # Tabla General de Suministros Cargados
+    st.markdown("---")
+    if st.session_state["materiales"] or st.session_state["imprevistos_materiales"] > 0:
         st.markdown("### 🛒 Materiales y Suministros Cargados en esta Cotización")
-        df_mat_orig = pd.DataFrame(st.session_state["materiales"])
-        df_mat_edit = st.data_editor(
-            df_mat_orig,
-            hide_index=True,
-            use_container_width=True,
-            disabled=["Descripción", "Costo Unitario ($)", "Costo Total ($)", "Precio Venta U ($)", "Precio Venta Total ($)"],
-            column_config={
-                "Borrar": st.column_config.CheckboxColumn("Borrar", default=False),
-                "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
-                "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99, step=1),
-            }
-        )
-        for i in range(len(df_mat_edit)):
-            r_pct = df_mat_edit.at[i, "Rentabilidad (%)"] / 100.0
-            c_uni = df_mat_edit.at[i, "Costo Unitario ($)"]
-            cant = df_mat_edit.at[i, "Cantidad"]
+        
+        if st.session_state["materiales"]:
+            df_mat_orig = pd.DataFrame(st.session_state["materiales"])
+            df_mat_edit = st.data_editor(
+                df_mat_orig,
+                hide_index=True,
+                use_container_width=True,
+                disabled=["Descripción", "Costo Unitario ($)", "Costo Total ($)", "Precio Venta U ($)", "Precio Venta Total ($)"],
+                column_config={
+                    "Borrar": st.column_config.CheckboxColumn("Borrar", default=False),
+                    "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                    "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99, step=1),
+                }
+            )
+            for i in range(len(df_mat_edit)):
+                r_pct = df_mat_edit.at[i, "Rentabilidad (%)"] / 100.0
+                c_uni = df_mat_edit.at[i, "Costo Unitario ($)"]
+                cant = df_mat_edit.at[i, "Cantidad"]
+                
+                df_mat_edit.at[i, "Costo Total ($)"] = c_uni * cant
+                p_venta_u = c_uni / (1 - r_pct) if r_pct < 1 else c_uni
+                df_mat_edit.at[i, "Precio Venta U ($)"] = p_venta_u
+                df_mat_edit.at[i, "Precio Venta Total ($)"] = p_venta_u * cant
+                
+            st.session_state["materiales"] = df_mat_edit.to_dict(orient="records")
             
-            df_mat_edit.at[i, "Costo Total ($)"] = c_uni * cant
-            p_venta_u = c_uni / (1 - r_pct) if r_pct < 1 else c_uni
-            df_mat_edit.at[i, "Precio Venta U ($)"] = p_venta_u
-            df_mat_edit.at[i, "Precio Venta Total ($)"] = p_venta_u * cant
-            
-        st.session_state["materiales"] = df_mat_edit.to_dict(orient="records")
-        if st.button("🗑️ Eliminar Materiales Seleccionados", key="del_mat"):
+        # Despliegue de métricas acumuladas incluyendo imprevistos directos al costo
+        costo_materiales_puros = sum(x.get("Costo Total ($)", 0.0) for x in st.session_state["materiales"])
+        venta_materiales_puras = sum(x.get("Precio Venta Total ($)", 0.0) for x in st.session_state["materiales"])
+        
+        costo_total_seccion = costo_materiales_puros + st.session_state["imprevistos_materiales"]
+        venta_total_seccion = venta_materiales_puras + st.session_state["imprevistos_materiales"]
+        
+        c_mat1, c_mat2, c_mat3 = st.columns(3)
+        c_mat1.metric("Costo Materiales + Imprevistos", f"${costo_total_seccion:,.2f}")
+        c_mat2.metric("Precio Venta Total Sección", f"${venta_total_seccion:,.2f}")
+        c_mat3.metric("Monto Neto Imprevistos (Costo Puro)", f"${st.session_state['imprevistos_materiales']:,.2f}")
+
+        if st.session_state["materiales"] and st.button("🗑️ Eliminar Materiales Seleccionados", key="del_mat"):
             st.session_state["materiales"] = [m for m in st.session_state["materiales"] if not m["Borrar"]]
             st.rerun()
 
@@ -506,13 +561,15 @@ with tab4:
     lista_eq = st.session_state.get("equipos", [])
     lista_mat = st.session_state.get("materiales", [])
     lista_mo = st.session_state.get("servicios_mo", [])
+    imprevistos = st.session_state.get("imprevistos_materiales", 0.0)
     
     costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
     venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
     utilidad_equipos = venta_equipos - costo_equipos
     
-    costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
-    venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
+    # Se suman imprevistos directo al costo y la venta (al 0% de rentabilidad adicional)
+    costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat) + imprevistos
+    venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat) + imprevistos
     utilidad_materiales = venta_materiales - costo_materiales
     
     costo_mo_tot = sum(x.get("Costo Interno ($)", 0.0) for x in lista_mo)
@@ -568,7 +625,7 @@ with tab4:
             })
         if venta_materiales > 0:
             tabla_final_items.append({
-                "Descripción del Rubro": "Materiales y Suministros Canalización",
+                "Descripción del Rubro": "Materiales y Suministros Canalización (Incluye Imprevistos)",
                 "Monto ($)": venta_materiales
             })
         
@@ -622,7 +679,7 @@ with tab4:
                 
             if venta_materiales > 0:
                 pdf.set_font("Helvetica", "", 10)
-                pdf.cell(140, 6, txt="Materiales y Suministros Canalización", border=1)
+                pdf.cell(140, 6, txt="Materiales y Suministros Canalización (Con Imprevistos)", border=1)
                 pdf.cell(50, 6, txt=f"${venta_materiales:.2f}", border=1, ln=True, align="R")
                 
             pdf.ln(6)
