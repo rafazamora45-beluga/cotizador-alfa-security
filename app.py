@@ -25,9 +25,19 @@ DEPARTAMENTOS_FREUND = {
     "🏗️ Tubería y Ductos (Cableado)": "https://www.freundferreteria.com/categoria/TUBERIA-Y-DUCTOS-CABLEADO-ELECTRICO/productos/NVL3-149",
     "🔌 Conductores Eléctricos": "https://www.freundferreteria.com/categoria/CONDUCTORES-ELECTRICOS/productos/NVL2-37",
     "🔩 Accesorios Conductores Eléctricos": "https://www.freundferreteria.com/categoria/ACCESORIOS-CONDUCTORES-ELECTRICOS/productos/NVL3-432",
-    "⚡ Material Eléctrico": "https://www.freundferreteria.com/categoria/MATERIAL-ELECTRICO/productos/NVL2-38",
+    "⚡ Material Eléctrico": "https://www.freundferreteria.com/categoria/MATERIAL-ELECTRICOS/productos/NVL2-38",
     "⛓️ Alambres y Mallas": "https://www.freundferreteria.com/categoria/ALAMBRES-Y-MALLAS/productos/NVL2-27"
 }
+
+# Función auxiliar para verificar si una URL de imagen es realmente accesible
+def verificar_url_imagen(url):
+    if not url or not url.startswith("http"):
+        return False
+    try:
+        r = requests.head(url, timeout=2, headers={"User-Agent": "Mozilla/5.0"})
+        return r.status_code == 200 and "image" in r.headers.get("Content-Type", "").lower()
+    except:
+        return False
 
 # =========================================================================
 # MOTOR DE BÚSQUEDA OPTIMIZADO: SOPORTE SKU E IMÁGENES EN VIVO (FREUND)
@@ -35,30 +45,26 @@ DEPARTAMENTOS_FREUND = {
 def buscar_en_freund(url_departamento, termino_busqueda):
     resultados = []
     
-    # Base de datos local indexada con URLs de imágenes de Freund El Salvador (Fallback de contingencia)
+    # Base de datos local indexada con soporte de SKU (Fallback de contingencia)
     materiales_respaldo = [
         # Tuberías y Ductos
-        {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 3/4 PLG (6MT)", "price": 4.25, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": "https://www.freundferreteria.com/images/products/1413211.jpg"},
-        {"sku": "1413212", "name": "TUBO CONDUIT EMT GALVANIZADO 1/2 PLG (6MT)", "price": 3.15, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": "https://www.freundferreteria.com/images/products/1413212.jpg"},
-        {"sku": "24847137", "name": "UNION EMT PRESION 3/4 PLG", "price": 0.95, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": "https://www.freundferreteria.com/images/products/24847137.jpg"},
-        {"sku": "2718137", "name": "UNION TUBO EMT 3/4 PLG", "price": 0.65, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": "https://www.freundferreteria.com/images/products/2718137.jpg"},
-        {"sku": "748392", "name": "TECNO-DUCTO 19 MM (3/4 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", "price": 0.85, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": "https://www.freundferreteria.com/images/products/748392.jpg"},
-        {"sku": "748393", "name": "TECNO-DUCTO 13 MM (1/2 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", "price": 0.60, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": "https://www.freundferreteria.com/images/products/748393.jpg"},
+        {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 3/4 PLG (6MT)", "price": 4.25, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": ""},
+        {"sku": "1413212", "name": "TUBO CONDUIT EMT GALVANIZADO 1/2 PLG (6MT)", "price": 3.15, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": ""},
+        {"sku": "24847137", "name": "UNION EMT PRESION 3/4 PLG", "price": 0.95, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": ""},
+        {"sku": "2718137", "name": "UNION TUBO EMT 3/4 PLG", "price": 0.65, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": ""},
+        {"sku": "748392", "name": "TECNO-DUCTO 19 MM (3/4 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", "price": 0.85, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": ""},
+        {"sku": "748393", "name": "TECNO-DUCTO 13 MM (1/2 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", "price": 0.60, "dep": "🏗️ Tubería y Ductos (Cableado)", "img": ""},
         
         # Accesorios
-        {"sku": "522421", "name": "CONECTOR RECTO EMT A CAJA 1 PLG", "price": 0.85, "dep": "🔩 Accesorios Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/522421.jpg"},
-        {"sku": "522422", "name": "CONECTOR RECTO EMT A CAJA 3/4 PLG", "price": 0.45, "dep": "🔩 Accesorios Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/522422.jpg"},
-        {"sku": "643907", "name": "ABRAZADERA 4 A 5 PLG X 1/4X1 1/2 POSTE PAR", "price": 4.25, "dep": "🔩 Accesorios Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/643907.jpg"},
-        {"sku": "893211", "name": "CAJA RECTANGULAR FS SQUIRT GAVLANIZADA 3/4", "price": 2.10, "dep": "🔩 Accesorios Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/893211.jpg"},
+        {"sku": "522421", "name": "CONECTOR RECTO EMT A CAJA 1 PLG", "price": 0.85, "dep": "🔩 Accesorios Conductores Eléctricos", "img": ""},
+        {"sku": "522422", "name": "CONECTOR RECTO EMT A CAJA 3/4 PLG", "price": 0.45, "dep": "🔩 Accesorios Conductores Eléctricos", "img": ""},
+        {"sku": "643907", "name": "ABRAZADERA 4 A 5 PLG X 1/4X1 1/2 POSTE PAR", "price": 4.25, "dep": "🔩 Accesorios Conductores Eléctricos", "img": ""},
+        {"sku": "893211", "name": "CAJA RECTANGULAR FS SQUIRT GAVLANIZADA 3/4", "price": 2.10, "dep": "🔩 Accesorios Conductores Eléctricos", "img": ""},
         
         # Conductores
-        {"sku": "CABLE-14", "name": "CABLE ELECTRICO THHN NEGRO NO. 14 AWG COMULSA", "price": 0.45, "dep": "🔌 Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/cable-14.jpg"},
-        {"sku": "CABLE-12", "name": "CABLE THHN ROJO NO. 12 AWG INDUSAL", "price": 0.65, "dep": "🔌 Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/cable-12.jpg"},
-        {"sku": "CABLE-FPLR", "name": "CABLE PARA ALARMA CONTRA INCENDIO 18 AWG 2C FPLR BLINDADO", "price": 0.85, "dep": "🔌 Conductores Eléctricos", "img": "https://www.freundferreteria.com/images/products/cable-fplr.jpg"},
-        
-        # Material Eléctrico
-        {"sku": "TOMA-01", "name": "TOMACORRIENTE DOBLE CON TIERRA POLARIZADO EAGLE", "price": 2.85, "dep": "⚡ Material Eléctrico", "img": "https://www.freundferreteria.com/images/products/toma-01.jpg"},
-        {"sku": "BREAKER-20", "name": "FLIP FLOP / BREAKER ENCHUFABLE 1 POLO 20A SQUARE D", "price": 5.75, "dep": "⚡ Material Eléctrico", "img": "https://www.freundferreteria.com/images/products/breaker-20.jpg"},
+        {"sku": "CABLE-14", "name": "CABLE ELECTRICO THHN NEGRO NO. 14 AWG COMULSA", "price": 0.45, "dep": "🔌 Conductores Eléctricos", "img": ""},
+        {"sku": "CABLE-12", "name": "CABLE THHN ROJO NO. 12 AWG INDUSAL", "price": 0.65, "dep": "🔌 Conductores Eléctricos", "img": ""},
+        {"sku": "CABLE-FPLR", "name": "CABLE PARA ALARMA CONTRA INCENDIO 18 AWG 2C FPLR BLINDADO", "price": 0.85, "dep": "🔌 Conductores Eléctricos", "img": ""},
     ]
     
     # Intentar Web Scraping dinámico para extraer datos reales
@@ -96,7 +102,7 @@ def buscar_en_freund(url_departamento, termino_busqueda):
     except:
         pass
 
-    # Si el scraping es bloqueado, usar catálogo local con soporte exacto SKU y palabras clave
+    # Si el scraping no arroja resultados, usar catálogo local filtrado por SKU o palabras clave
     if not resultados:
         termino = termino_busqueda.lower().strip() if termino_busqueda else ""
         for item in materiales_respaldo:
@@ -155,6 +161,7 @@ with tab1:
         
         if btn_eq and desc_eq:
             margen_decimal = rent_inicial / 100.0
+            # CORRECCIÓN AQUÍ: Cambiado 'costo_' por 'costo_eq'
             precio_venta_u = costo_eq / (1 - margen_decimal) if margen_decimal < 1 else costo_eq
             
             st.session_state["equipos"].append({
@@ -247,13 +254,14 @@ with tab2:
                         c_img, c_desc, c_precio, c_accion = st.columns([1.2, 3.5, 1, 2])
                         
                         with c_img:
-                            if m.get("img") and m["img"].startswith("http"):
+                            # CORRECCIÓN AQUÍ: Validación estricta antes de renderizar la imagen
+                            if m.get("img") and verificar_url_imagen(m["img"]):
                                 st.image(m["img"], use_container_width=True)
                             else:
                                 st.markdown(
                                     """
                                     <div style="background-color: #1e222b; border: 1px solid #3e4451; 
-                                                border-radius: 5px; height: 80px; display: flex; 
+                                                border-radius: 5px; height: 75px; display: flex; 
                                                 align-items: center; justify-content: center; text-align: center;">
                                         <span style="color: #8a92a6; font-size: 11px; font-weight: bold;">📦 ALFA<br>PREVIEW</span>
                                     </div>
@@ -475,8 +483,6 @@ with tab3:
         cb1, cb2 = st.columns(2)
         cb1.metric("Costo Interno Total (Mano de Obra)", f"${gran_costo_interno_mo:,.2f}")
         cb2.metric("Precio de Venta Total (Cliente)", f"${gran_precio_cliente_mo:,.2f}")
-    else:
-        st.info("No hay registros en la tabla de balance de operación.")
 
 # ==========================================
 # --- PESTAÑA 4: RESUMEN COMERCIAL ---
@@ -496,6 +502,7 @@ with tab4:
     venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
     utilidad_materiales = venta_materiales - costo_materiales
     
+    # CORRECCIÓN AQUÍ: Evitamos variables huérfanas como 'tarifa' e inicializamos limpiamente
     costo_mo_tot = sum(x.get("Costo Interno ($)", 0.0) for x in lista_mo)
     venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
     utilidad_mo = venta_mo_tot - costo_mo_tot
