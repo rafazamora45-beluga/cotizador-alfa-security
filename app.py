@@ -151,7 +151,7 @@ def buscar_en_freund(url_departamento, termino_busqueda):
                 resultados.append(item_final)
     return resultados
 
-# PANEL IZQUIERDO
+# PANEL IZQUIERDO (SIDEBAR)
 ruta_logo = "LOGO_ALFA-02.png"
 if os.path.exists(ruta_logo):
     st.sidebar.image(ruta_logo, use_container_width=True)
@@ -163,7 +163,7 @@ atencion = st.sidebar.text_input("Atención a:", "Rafael Zamora")
 validez = st.sidebar.text_input("Validez de la Oferta", "20 días")
 pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraentrega")
 
-# Pestañas de Navegación
+# Pestañas principales de Navegación
 tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
     "🏗️ Materiales", 
@@ -232,7 +232,7 @@ with tab1:
 # --- PESTAÑA 2: MATERIALES ---
 # ==========================================
 with tab2:
-    st.subheader("🔍 Extractor de Catálogo — Fertererías Freund El Salvador")
+    st.subheader("🔍 Extractor de Catálogo — Ferreterías Freund El Salvador")
     
     col_busc, col_manu = st.columns([5, 4])
     
@@ -425,43 +425,84 @@ with tab3:
             st.rerun()
 
 # ==========================================
-# --- PESTAÑA 4: RESUMEN COMERCIAL ---
+# --- PESTAÑA 4: RESUMEN COMERCIAL (RESTAURADA) ---
 # ==========================================
 with tab4:
     st.subheader("📊 Resumen General Comercial")
+    
     lista_eq = st.session_state.get("equipos", [])
     lista_mat = st.session_state.get("materiales", [])
     lista_mo = st.session_state.get("servicios_mo", [])
     
-    costo_equipos = sum(x.get("Costo Total ($)", 0.0) for x in lista_eq)
-    venta_equipos = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_eq)
-    costo_materiales = sum(x.get("Costo Total ($)", 0.0) for x in lista_mat)
-    venta_materiales = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mat)
-    costo_mo_tot = sum(x.get("Costo Interno ($)", 0.0) for x in lista_mo)
-    venta_mo_tot = sum(x.get("Precio Venta Total ($)", 0.0) for x in lista_mo)
+    # 1. CÁLCULO ESTRICTO DE COSTOS INTERNOS Y VALORES DE VENTA
+    costo_equipos = sum(float(x.get("Costo Total ($)", 0.0)) for x in lista_eq)
+    venta_equipos = sum(float(x.get("Precio Venta Total ($)", 0.0)) for x in lista_eq)
     
+    costo_materiales = sum(float(x.get("Costo Total ($)", 0.0)) for x in lista_mat)
+    venta_materiales = sum(float(x.get("Precio Venta Total ($)", 0.0)) for x in lista_mat)
+    
+    costo_mo_tot = sum(float(x.get("Costo Interno ($)", 0.0)) for x in lista_mo)
+    venta_mo_tot = sum(float(x.get("Precio Venta Total ($)", 0.0)) for x in lista_mo)
+    
+    # Totales Globales del Proyecto
     costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
     subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
     utilidad_total = subtotal_venta_proyecto - costo_total_proyecto
     rentabilidad_real_pct = (utilidad_total / subtotal_venta_proyecto * 100) if subtotal_venta_proyecto > 0 else 0.0
     
+    # Checkbox para Impuestos Locales (El Salvador)
     aplicar_iva = st.checkbox("Aplicar IVA (13%) a la oferta comercial", value=True)
     iva_calc = subtotal_venta_proyecto * 0.13 if aplicar_iva else 0.0
     total_general_cliente = subtotal_venta_proyecto + iva_calc
     
+    # Muestra de Métricas Clave
     st.markdown("---")
-    col_rent1, col_rent2 = st.columns(2)
+    col_rent1, col_rent2, col_rent3 = st.columns(3)
     col_rent1.metric("Costo Total Interno", f"${costo_total_proyecto:,.2f}")
-    col_rent2.metric("Rentabilidad Real del Proyecto", f"{rentabilidad_real_pct:.2f}%")
+    col_rent2.metric("Precio Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
+    col_rent3.metric("Rentabilidad Real Global", f"{rentabilidad_real_pct:.2f}%")
     
+    # 2. CONSTRUCCIÓN DE LA TABLA DINÁMICA DE RUBROS
     tabla_final_items = []
+    
+    # Equipos detallados uno a uno
     for eq in lista_eq:
-        tabla_final_items.append({"Descripción del Rubro": f"Equipo: {eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})", "Monto ($)": eq["Precio Venta Total ($)"]})
-    if venta_materiales > 0:
-        tabla_final_items.append({"Descripción del Rubro": "Materiales y Suministros Canalización", "Monto ($)": venta_materiales})
-    if venta_mo_tot > 0:
-        tabla_final_items.append({"Descripción del Rubro": "Mano de Obra e Ingeniería de Instalación", "Monto ($)": venta_mo_tot})
+        tabla_final_items.append({
+            "Descripción del Rubro": f"📦 EQUIPO: {eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})", 
+            "Monto ($)": eq["Precio Venta Total ($)"]
+        })
         
+    # Materiales agrupados o individuales si existen
+    for mat in lista_mat:
+        tabla_final_items.append({
+            "Descripción del Rubro": f"🏗️ MATERIAL: {mat['Descripción']} (Cant: {mat['Cantidad']} x ${mat['Precio Venta U ($)']:.2f})", 
+            "Monto ($)": mat["Precio Venta Total ($)"]
+        })
+        
+    # Mano de obra detallada
+    for mo in lista_mo:
+        tabla_final_items.append({
+            "Descripción del Rubro": f"🛠️ MO / LOGÍSTICA: {mo['Descripción']} (Cant: {mo['Cantidad']:.1f})", 
+            "Monto ($)": mo["Precio Venta Total ($)"]
+        })
+        
+    # Renderizado final de la propuesta financiera
     if tabla_final_items:
-        st.table(pd.DataFrame(tabla_final_items))
-        st.markdown(f"**SUBTOTAL:** ${subtotal_venta_proyecto:,.2f} | **IVA (13%):** ${iva_calc:,.2f} | **TOTAL NETO:** **${total_general_cliente:,.2f}**")
+        st.markdown("### 📋 Desglose Comercial de la Oferta")
+        df_resumen_comercial = pd.DataFrame(tabla_final_items)
+        st.table(df_resumen_comercial)
+        
+        st.markdown(
+            f"""
+            <div style="background-color: #1e222b; padding: 20px; border-radius: 8px; border: 1px solid #2d3139; margin-top: 15px;">
+                <h4 style="margin: 0; color: #ffffff;">📊 BALANCE FINAL DE CARA AL CLIENTE</h4>
+                <p style="margin: 8px 0 0 0; font-size: 16px;"><b>SUBTOTAL NETO:</b> <span style="color: #58a6ff;">${subtotal_venta_proyecto:,.2f}</span></p>
+                <p style="margin: 4px 0 0 0; font-size: 16px;"><b>IVA REPERCUTIDO (13%):</b> ${iva_calc:,.2f}</p>
+                <hr style="border-color: #2d3139; margin: 12px 0;">
+                <h3 style="margin: 0; color: #ff7b72;">TOTAL VALOR OFERTA: ${total_general_cliente:,.2f}</h3>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("Aún no has agregado ningún elemento en las pestañas anteriores para generar el balance comercial.")
