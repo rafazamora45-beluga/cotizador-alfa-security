@@ -31,6 +31,31 @@ DEPARTAMENTOS_FREUND = {
 }
 
 # =========================================================================
+# CLASE PDF PARA LOGÍSTICA DE REPORTES
+# =========================================================================
+class PDF_Cotizacion(FPDF):
+    def header(self):
+        if os.path.exists("LOGO_ALFA-02.png"):
+            self.image("LOGO_ALFA-02.png", 10, 8, 33)
+        self.set_font("Arial", "B", 14)
+        self.cell(80)
+        self.cell(110, 10, "ALFA SECURITY S.A. DE C.V.", 0, 0, "R")
+        self.ln(5)
+        self.set_font("Arial", "", 9)
+        self.cell(80)
+        self.cell(110, 10, "Seguridad Electrónica e Ingeniería de Incendio", 0, 0, "R")
+        self.ln(12)
+        self.set_draw_color(180, 180, 180)
+        self.line(10, self.get_y(), 200, self.get_y())
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Arial", "I", 8)
+        self.set_text_color(120, 120, 120)
+        self.cell(0, 10, f"Página {self.page_no()} de {{nb}} — Oferta Técnico-Comercial Alfa Security", 0, 0, "C")
+
+# =========================================================================
 # MOTOR DE EXTRACCIÓN EN TIEMPO REAL
 # =========================================================================
 def obtener_datos_reales_producto(url_producto):
@@ -77,54 +102,12 @@ def obtener_datos_reales_producto(url_producto):
 def buscar_en_freund(url_departamento, termino_busqueda):
     resultados = []
     materiales_verificados = [
-        {
-            "sku": "24847137", 
-            "name": "UNION CONDUIT TUBERIA 19 mm (3/4 in) ACERO GALVANIZADO EMT PRESION", 
-            "price_default": 0.95, 
-            "dep": "🏗️ Tubería y Ductos (Cableado)", 
-            "link": "https://www.freundferreteria.com/producto/UNION-EMT-PRESION-3-4-PLG/24847137",
-            "img_default": None
-        },
-        {
-            "sku": "1413211", 
-            "name": "TUBO CONDUIT EMT GALVANIZADO 19 mm (3/4 PLG) LONGITUD 3 METROS", 
-            "price_default": 4.25, 
-            "dep": "🏗️ Tubería y Ductos (Cableado)", 
-            "link": "https://www.freundferreteria.com/producto/TUBO-CONDUIT-EMT-GALVANIZADO-3-4-PLG--6MT-/1413211",
-            "img_default": None
-        },
-        {
-            "sku": "1413212", 
-            "name": "TUBO CONDUIT EMT GALVANIZADO 13 mm (1/2 PLG) LONGITUD 3 METROS", 
-            "price_default": 3.15, 
-            "dep": "🏗️ Tubería y Ductos (Cableado)", 
-            "link": "https://www.freundferreteria.com/producto/TUBO-CONDUIT-EMT-GALVANIZADO-1-2-PLG--6MT-/1413212",
-            "img_default": None
-        },
-        {
-            "sku": "2718137", 
-            "name": "UNION CONDUIT TUBERIA 19 MM (3/4 IN) GALVANIZADO ZINC EMT CON TORNILLO", 
-            "price_default": 0.65, 
-            "dep": "🏗️ Tubería y Ductos (Cableado)", 
-            "link": "https://www.freundferreteria.com/producto/UNION-TUBO-EMT-3-4-PLG/2718137",
-            "img_default": None
-        },
-        {
-            "sku": "748392", 
-            "name": "TECNO-DUCTO 19 MM (3/4 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", 
-            "price_default": 0.85, 
-            "dep": "🏗️ Tubería y Ductos (Cableado)", 
-            "link": "https://www.freundferreteria.com/buscar?text=TECNO-DUCTO%2019",
-            "img_default": None
-        },
-        {
-            "sku": "748393", 
-            "name": "TECNO-DUCTO 13 MM (1/2 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", 
-            "price_default": 0.60, 
-            "dep": "🏗️ Tubería y Ductos (Cableado)", 
-            "link": "https://www.freundferreteria.com/buscar?text=TECNO-DUCTO%2013",
-            "img_default": None
-        }
+        {"sku": "24847137", "name": "UNION CONDUIT TUBERIA 19 mm (3/4 in) ACERO GALVANIZADO EMT PRESION", "price_default": 0.95, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/UNION-EMT-PRESION-3-4-PLG/24847137", "img_default": None},
+        {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 19 mm (3/4 PLG) LONGITUD 3 METROS", "price_default": 4.25, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/TUBO-CONDUIT-EMT-GALVANIZADO-3-4-PLG--6MT-/1413211", "img_default": None},
+        {"sku": "1413212", "name": "TUBO CONDUIT EMT GALVANIZADO 13 mm (1/2 PLG) LONGITUD 3 METROS", "price_default": 3.15, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/TUBO-CONDUIT-EMT-GALVANIZADO-1-2-PLG--6MT-/1413212", "img_default": None},
+        {"sku": "2718137", "name": "UNION CONDUIT TUBERIA 19 MM (3/4 IN) GALVANIZADO ZINC EMT CON TORNILLO", "price_default": 0.65, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/UNION-TUBO-EMT-3-4-PLG/2718137", "img_default": None},
+        {"sku": "748392", "name": "TECNO-DUCTO 19 MM (3/4 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", "price_default": 0.85, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/buscar?text=TECNO-DUCTO%2019", "img_default": None},
+        {"sku": "748393", "name": "TECNO-DUCTO 13 MM (1/2 IN) CORRUGADO CABLEADO ELECTRICO PVC GRIS", "price_default": 0.60, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/buscar?text=TECNO-DUCTO%2013", "img_default": None}
     ]
     
     termino = termino_busqueda.lower().strip() if termino_busqueda else ""
@@ -188,13 +171,9 @@ with tab1:
             margen_decimal = rent_inicial / 100.0
             precio_venta_u = costo_eq / (1 - margen_decimal) if margen_decimal < 1 else costo_eq
             st.session_state["equipos"].append({
-                "Borrar": False,
-                "Descripción": desc_eq.upper(),
-                "Cantidad": int(cant_eq),
-                "Costo Unitario ($)": float(costo_eq),
-                "Costo Total ($)": float(costo_eq * cant_eq),
-                "Rentabilidad (%)": float(rent_inicial),
-                "Precio Venta U ($)": float(precio_venta_u),
+                "Borrar": False, "Descripción": desc_eq.upper(), "Cantidad": int(cant_eq),
+                "Costo Unitario ($)": float(costo_eq), "Costo Total ($)": float(costo_eq * cant_eq),
+                "Rentabilidad (%)": float(rent_inicial), "Precio Venta U ($)": float(precio_venta_u),
                 "Precio Venta Total ($)": float(precio_venta_u * cant_eq)
             })
             st.toast(f"Agregado: {desc_eq.upper()}")
@@ -233,7 +212,6 @@ with tab1:
 # ==========================================
 with tab2:
     st.subheader("🔍 Extractor de Catálogo — Ferreterías Freund El Salvador")
-    
     col_busc, col_manu = st.columns([5, 4])
     
     with col_busc:
@@ -261,14 +239,9 @@ with tab2:
             if btn_manual and m_desc:
                 p_v = m_costo / (1 - 0.40)
                 st.session_state["materiales"].append({
-                    "Borrar": False,
-                    "Descripción": m_desc.upper(),
-                    "Cantidad": int(m_cant),
-                    "Costo Unitario ($)": float(m_costo),
-                    "Costo Total ($)": float(m_costo * m_cant),
-                    "Rentabilidad (%)": 40.0,
-                    "Precio Venta U ($)": float(p_v),
-                    "Precio Venta Total ($)": float(p_v * m_cant)
+                    "Borrar": False, "Descripción": m_desc.upper(), "Cantidad": int(m_cant),
+                    "Costo Unitario ($)": float(m_costo), "Costo Total ($)": float(m_costo * m_cant),
+                    "Rentabilidad (%)": 40.0, "Precio Venta U ($)": float(p_v), "Precio Venta Total ($)": float(p_v * m_cant)
                 })
                 st.toast(f"✅ Material manual cargado: {m_desc.upper()}")
 
@@ -294,14 +267,9 @@ with tab2:
                     if st.button("📥 Agregar al Costeo", key=f"f_btn_{i}"):
                         p_v = m['price'] / (1 - 0.40)
                         st.session_state["materiales"].append({
-                            "Borrar": False,
-                            "Descripción": m['name'],
-                            "Cantidad": int(cant_m),
-                            "Costo Unitario ($)": float(m['price']),
-                            "Costo Total ($)": float(m['price'] * cant_m),
-                            "Rentabilidad (%)": 40.0,
-                            "Precio Venta U ($)": float(p_v),
-                            "Precio Venta Total ($)": float(p_v * cant_m)
+                            "Borrar": False, "Descripción": m['name'], "Cantidad": int(cant_m),
+                            "Costo Unitario ($)": float(m['price']), "Costo Total ($)": float(m['price'] * cant_m),
+                            "Rentabilidad (%)": 40.0, "Precio Venta U ($)": float(p_v), "Precio Venta Total ($)": float(p_v * cant_m)
                         })
                         st.toast(f"✅ Suministro cargado: {m['name']}")
                 st.markdown("<div style='margin-top: 12px; margin-bottom: 12px; border-bottom: 1px solid #2d3139;'></div>", unsafe_allow_html=True)
@@ -425,16 +393,16 @@ with tab3:
             st.rerun()
 
 # ==========================================
-# --- PESTAÑA 4: RESUMEN COMERCIAL (RESTAURADA) ---
+# --- PESTAÑA 4: RESUMEN COMERCIAL (COMPLETA Y EN MARCHA) ---
 # ==========================================
 with tab4:
-    st.subheader("📊 Resumen General Comercial")
+    st.subheader("📊 Análisis y Estructura Financiera")
     
     lista_eq = st.session_state.get("equipos", [])
     lista_mat = st.session_state.get("materiales", [])
     lista_mo = st.session_state.get("servicios_mo", [])
     
-    # 1. CÁLCULO ESTRICTO DE COSTOS INTERNOS Y VALORES DE VENTA
+    # Cálculos Financieros Consolidados
     costo_equipos = sum(float(x.get("Costo Total ($)", 0.0)) for x in lista_eq)
     venta_equipos = sum(float(x.get("Precio Venta Total ($)", 0.0)) for x in lista_eq)
     
@@ -444,65 +412,127 @@ with tab4:
     costo_mo_tot = sum(float(x.get("Costo Interno ($)", 0.0)) for x in lista_mo)
     venta_mo_tot = sum(float(x.get("Precio Venta Total ($)", 0.0)) for x in lista_mo)
     
-    # Totales Globales del Proyecto
     costo_total_proyecto = costo_equipos + costo_materiales + costo_mo_tot
     subtotal_venta_proyecto = venta_equipos + venta_materiales + venta_mo_tot
     utilidad_total = subtotal_venta_proyecto - costo_total_proyecto
     rentabilidad_real_pct = (utilidad_total / subtotal_venta_proyecto * 100) if subtotal_venta_proyecto > 0 else 0.0
+
+    # Panel de control de Impuestos y Rentabilidad Objetivo
+    c_ctr1, c_ctr2 = st.columns(2)
+    rent_objetivo = c_ctr1.number_input("🎯 Rentabilidad Comercial Objetivo (%)", min_value=1.0, max_value=99.0, value=40.0, step=1.0)
+    aplicar_iva = c_ctr2.checkbox("⚠️ Aplicar IVA de Ley (13%) a la Oferta", value=True)
     
-    # Checkbox para Impuestos Locales (El Salvador)
-    aplicar_iva = st.checkbox("Aplicar IVA (13%) a la oferta comercial", value=True)
     iva_calc = subtotal_venta_proyecto * 0.13 if aplicar_iva else 0.0
     total_general_cliente = subtotal_venta_proyecto + iva_calc
-    
-    # Muestra de Métricas Clave
+
     st.markdown("---")
-    col_rent1, col_rent2, col_rent3 = st.columns(3)
-    col_rent1.metric("Costo Total Interno", f"${costo_total_proyecto:,.2f}")
-    col_rent2.metric("Precio Venta (Subtotal)", f"${subtotal_venta_proyecto:,.2f}")
-    col_rent3.metric("Rentabilidad Real Global", f"{rentabilidad_real_pct:.2f}%")
     
-    # 2. CONSTRUCCIÓN DE LA TABLA DINÁMICA DE RUBROS
-    tabla_final_items = []
+    # KPIs Principales
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Costo Interno Global", f"${costo_total_proyecto:,.2f}")
+    kpi2.metric("Precio Venta Subtotal", f"${subtotal_venta_proyecto:,.2f}")
     
-    # Equipos detallados uno a uno
-    for eq in lista_eq:
-        tabla_final_items.append({
-            "Descripción del Rubro": f"📦 EQUIPO: {eq['Descripción']} (Cant: {eq['Cantidad']} x ${eq['Precio Venta U ($)']:.2f})", 
-            "Monto ($)": eq["Precio Venta Total ($)"]
-        })
+    # Indicador dinámico de Rentabilidad Real
+    if rentabilidad_real_pct >= rent_objetivo:
+        kpi3.metric("Rentabilidad Real", f"{rentabilidad_real_pct:.2f}%", f"▲ Cumple objetivo ({rent_objetivo}%)")
+    else:
+        kpi3.metric("Rentabilidad Real", f"{rentabilidad_real_pct:.2f}%", f"▼ Abajo del objetivo", delta_color="inverse")
         
-    # Materiales agrupados o individuales si existen
-    for mat in lista_mat:
-        tabla_final_items.append({
-            "Descripción del Rubro": f"🏗️ MATERIAL: {mat['Descripción']} (Cant: {mat['Cantidad']} x ${mat['Precio Venta U ($)']:.2f})", 
-            "Monto ($)": mat["Precio Venta Total ($)"]
-        })
-        
-    # Mano de obra detallada
-    for mo in lista_mo:
-        tabla_final_items.append({
-            "Descripción del Rubro": f"🛠️ MO / LOGÍSTICA: {mo['Descripción']} (Cant: {mo['Cantidad']:.1f})", 
-            "Monto ($)": mo["Precio Venta Total ($)"]
-        })
-        
-    # Renderizado final de la propuesta financiera
-    if tabla_final_items:
-        st.markdown("### 📋 Desglose Comercial de la Oferta")
-        df_resumen_comercial = pd.DataFrame(tabla_final_items)
-        st.table(df_resumen_comercial)
-        
+    kpi4.metric("Utilidad Bruta Alfa", f"${utilidad_total:,.2f}")
+
+    # Distribución Operativa (Pie Chart) y Detalles
+    st.markdown("### 📊 Composición del Presupuesto Comercial")
+    col_chart, col_table = st.columns([4, 6])
+    
+    df_chart = pd.DataFrame([
+        {"Rubro": "📦 Equipos Principales", "Monto ($)": venta_equipos},
+        {"🏗️ Materiales y Canalización", "Monto ($)": venta_materiales},
+        {"🛠️ Mano de Obra e Ingeniería", "Monto ($)": venta_mo_tot}
+    ])
+    
+    with col_chart:
+        if subtotal_venta_proyecto > 0:
+            fig = px.pie(df_chart, values="Monto ($)", names="Rubro", hole=0.4,
+                         color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=260, showlegend=True)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Sin datos financieros para graficar.")
+
+    with col_table:
+        tabla_resumen = []
+        for eq in lista_eq:
+            tabla_resumen.append({"Tipo": "Equipo", "Detalle del Ítem": eq['Descripción'], "Cantidad": eq['Cantidad'], "Venta Total ($)": eq['Precio Venta Total ($)']})
+        for mat in lista_mat:
+            tabla_resumen.append({"Tipo": "Material", "Detalle del Ítem": mat['Descripción'], "Cantidad": mat['Cantidad'], "Venta Total ($)": mat['Precio Venta Total ($)']})
+        for mo in lista_mo:
+            tabla_resumen.append({"Tipo": "Mano de Obra", "Detalle del Ítem": mo['Descripción'], "Cantidad": mo['Cantidad'], "Venta Total ($)": mo['Precio Venta Total ($)']})
+            
+        if tabla_resumen:
+            st.dataframe(pd.DataFrame(tabla_resumen), hide_index=True, use_container_width=True)
+        else:
+            st.warning("No hay elementos cargados en la cotización.")
+
+    # Caja de Cierre y Botón de Reporte PDF
+    if subtotal_venta_proyecto > 0:
         st.markdown(
             f"""
             <div style="background-color: #1e222b; padding: 20px; border-radius: 8px; border: 1px solid #2d3139; margin-top: 15px;">
-                <h4 style="margin: 0; color: #ffffff;">📊 BALANCE FINAL DE CARA AL CLIENTE</h4>
-                <p style="margin: 8px 0 0 0; font-size: 16px;"><b>SUBTOTAL NETO:</b> <span style="color: #58a6ff;">${subtotal_venta_proyecto:,.2f}</span></p>
-                <p style="margin: 4px 0 0 0; font-size: 16px;"><b>IVA REPERCUTIDO (13%):</b> ${iva_calc:,.2f}</p>
-                <hr style="border-color: #2d3139; margin: 12px 0;">
-                <h3 style="margin: 0; color: #ff7b72;">TOTAL VALOR OFERTA: ${total_general_cliente:,.2f}</h3>
+                <h4 style="margin: 0; color: #ffffff;">🧾 CIERRE DE COTIZACIÓN COMERCIAL</h4>
+                <p style="margin: 8px 0 0 0; font-size: 15px;"><b>SUBTOTAL NETO DE VENTA:</b> ${subtotal_venta_proyecto:,.2f}</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px;"><b>IVA REPERCUTIDO (13%):</b> ${iva_calc:,.2f}</p>
+                <hr style="border-color: #2d3139; margin: 10px 0;">
+                <h2 style="margin: 0; color: #58a6ff;">VALOR TOTAL DE LA OFERTA: ${total_general_cliente:,.2f}</h2>
             </div>
-            """, 
-            unsafe_allow_html=True
+            """, unsafe_allow_html=True
         )
-    else:
-        st.info("Aún no has agregado ningún elemento en las pestañas anteriores para generar el balance comercial.")
+        
+        # Lógica de Construcción de PDF en Memoria
+        pdf = PDF_Cotizacion()
+        pdf.alias_nb_pages()
+        pdf.add_page()
+        
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 7, f"PROYECTO: {proyecto.upper()}", 0, 1)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(100, 6, f"Cliente: {empresa}", 0, 0)
+        pdf.cell(90, 6, f"Validez: {validez}", 0, 1)
+        pdf.cell(100, 6, f"Atención: {atencion}", 0, 0)
+        pdf.cell(90, 6, f"Pago: {pago}", 0, 1)
+        pdf.ln(5)
+        
+        pdf.set_fill_color(30, 41, 59)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(110, 7, " DESCRIPCION DEL RUBRO / ITEM", 1, 0, "L", True)
+        pdf.cell(25, 7, "CANTIDAD", 1, 0, "C", True)
+        pdf.cell(25, 7, "P. UNITARIO", 1, 0, "R", True)
+        pdf.cell(30, 7, "TOTAL", 1, 1, "R", True)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "", 8.5)
+        
+        for item in tabla_resumen:
+            p_u = item["Venta Total ($)"] / item["Cantidad"]
+            pdf.cell(110, 6, f" [{item['Tipo'].upper()}] {item['Detalle del Ítem'][:55]}", 1, 0, "L")
+            pdf.cell(25, 6, f"{item['Cantidad']}", 1, 0, "C")
+            pdf.cell(25, 6, f"${p_u:,.2f}", 1, 0, "R")
+            pdf.cell(30, 6, f"${item['Venta Total ($)']:,.2f}", 1, 1, "R")
+            
+        pdf.ln(4)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(140, 6, "SUBTOTAL NETO:", 0, 0, "R")
+        pdf.cell(50, 6, f"${subtotal_venta_proyecto:,.2f}", 0, 1, "R")
+        pdf.cell(140, 6, "IVA (13%):", 0, 0, "R")
+        pdf.cell(50, 6, f"${iva_calc:,.2f}", 0, 1, "R")
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(140, 6, "TOTAL DE LA OFERTA:", 0, 0, "R")
+        pdf.cell(50, 6, f"${total_general_cliente:,.2f}", 0, 1, "R")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Descargar Propuesta Comercial en PDF",
+            data=pdf.output(dest='S').encode('latin-1'),
+            file_name=f"Oferta_{empresa.replace(' ', '_')}.pdf",
+            mime="application/pdf"
+        )
