@@ -415,7 +415,7 @@ with tab4:
         col_f1.markdown(f"* **Términos de Pago:** {pago}\n* **Validez de Oferta:** {validez}")
         col_f2.markdown(f"* **SUBTOTAL:** ${subtotal_venta_proyecto:,.2f}\n* **IVA (13%):** ${iva_calc:,.2f}\n* **TOTAL NETO:** **${total_general_cliente:,.2f}**")
 
-        # --- SECCIÓN DE GENERACIÓN DE PDF ---
+        # --- SECCIÓN DE GENERACIÓN DE PDF REPARADA (fpdf2) ---
         def generar_pdf():
             pdf = FPDF()
             pdf.add_page()
@@ -480,9 +480,10 @@ with tab4:
             pdf.set_font("Helvetica", "B", 12)
             pdf.cell(50, 6, txt=f"${total_general_cliente:.2f}", border=1, ln=True, align="R")
             
+            # fpdf2 devuelve bytes directamente de forma nativa sin parámetros antiguos
             return pdf.output()
 
-        # Botón de Descarga
+        # Botón de Descarga Seguro
         if tabla_final_items:
             try:
                 pdf_bytes = generar_pdf()
