@@ -39,7 +39,7 @@ pago = st.sidebar.text_input("Condiciones de Pago", "60% Anticipo / 40% Contraen
 # Creación limpia de las pestañas
 tab1, tab2, tab3, tab4 = st.tabs([
     "📦 Equipos Principales", 
-    "🔍 Buscador Freund (Materiales)", 
+    "🔍 Materiales", 
     "🛠️ Mano de Obra", 
     "📊 Resumen Comercial"
 ])
