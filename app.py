@@ -102,7 +102,7 @@ def obtener_datos_reales_producto(url_producto):
 def buscar_en_freund(url_departamento, termino_busqueda):
     resultados = []
     materiales_verificados = [
-        {"sku": "24847137", "name": "UNION CONDUIT TUBERIA 19 mm (3/4 in) ACERO GALVANIZADO EMT PRESION", "price_default": 0.95, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/UNION-EMT-PRESION-3-4-PLG/24847137", "img_default": None},
+        {"sku": "24847137", "name": "UNION CONDUIT TUBERIA 19 mm (3/4 in) ACERO GALVANIZADO EMT PRESION", "price_default": 0.95, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/UNION-EMT-PRESION-3-4-PLG/24847137", "img_default": "https://www.freundferreteria.com/media/catalog/product/2/4/24847137.jpg"},
         {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 19 mm (3/4 PLG) LONGITUD 3 METROS", "price_default": 4.25, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/TUBO-CONDUIT-EMT-GALVANIZADO-3-4-PLG--6MT-/1413211", "img_default": None},
         {"sku": "1413212", "name": "TUBO CONDUIT EMT GALVANIZADO 13 mm (1/2 PLG) LONGITUD 3 METROS", "price_default": 3.15, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/TUBO-CONDUIT-EMT-GALVANIZADO-1-2-PLG--6MT-/1413212", "img_default": None},
         {"sku": "2718137", "name": "UNION CONDUIT TUBERIA 19 MM (3/4 IN) GALVANIZADO ZINC EMT CON TORNILLO", "price_default": 0.65, "dep": "🏗️ Tubería y Ductos (Cableado)", "link": "https://www.freundferreteria.com/producto/UNION-TUBO-EMT-3-4-PLG/2718137", "img_default": None},
@@ -255,7 +255,7 @@ with tab2:
                     if m.get("img"):
                         st.image(m["img"], use_container_width=True)
                     else:
-                        st.markdown(f'<div style="background-color: #1e222b; border: 1px dashed #4e5565; border-radius: 5px; height: 90px; display: flex; align-items: center; justify-content: center; text-align: center;"><span style="color: #8a92a6; font-size: 11px;">ALFA PREVIEW</span></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="background-color: #1e222b; border: 1px dashed #4e5565; border-radius: 5px; height: 75px; display: flex; align-items: center; justify-content: center; text-align: center;"><span style="color: #8a92a6; font-size: 11px;">📦 ALFA PREVIEW</span></div>', unsafe_allow_html=True)
                 with c_desc:
                     st.markdown(f"**{m['name']}**")
                     st.markdown(f"`SKU Real: {m['sku']}`")
@@ -393,7 +393,7 @@ with tab3:
             st.rerun()
 
 # ==========================================
-# --- PESTAÑA 4: RESUMEN COMERCIAL (COMPLETA Y EN MARCHA) ---
+# --- PESTAÑA 4: RESUMEN COMERCIAL COMERCIAL ---
 # ==========================================
 with tab4:
     st.subheader("📊 Análisis y Estructura Financiera")
@@ -444,10 +444,11 @@ with tab4:
     st.markdown("### 📊 Composición del Presupuesto Comercial")
     col_chart, col_table = st.columns([4, 6])
     
+    # CORREGIDO: Sintaxis limpia del diccionario sin llaves rotas
     df_chart = pd.DataFrame([
         {"Rubro": "📦 Equipos Principales", "Monto ($)": venta_equipos},
-        {"🏗️ Materiales y Canalización", "Monto ($)": venta_materiales},
-        {"🛠️ Mano de Obra e Ingeniería", "Monto ($)": venta_mo_tot}
+        {"Rubro": "🏗️ Materiales y Canalización", "Monto ($)": venta_materiales},
+        {"Rubro": "🛠️ Mano de Obra e Ingeniería", "Monto ($)": venta_mo_tot}
     ])
     
     with col_chart:
