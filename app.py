@@ -20,7 +20,7 @@ st.set_page_config(page_title="Cotizador Inteligente - Alfa Security", layout="w
 st.title("🛡️ Sistema de Cotizaciones Automáticas — Alfa Security")
 st.markdown("---")
 
-# Diccionario de Departamentos Oficiales proporcionados por el usuario
+# Diccionario de Departamentos Oficiales de Freund
 DEPARTAMENTOS_FREUND = {
     "🏗️ Tubería y Ductos (Cableado)": "https://www.freundferreteria.com/categoria/TUBERIA-Y-DUCTOS-CABLEADO-ELECTRICO/productos/NVL3-149",
     "🔌 Conductores Eléctricos": "https://www.freundferreteria.com/categoria/CONDUCTORES-ELECTRICOS/productos/NVL2-37",
@@ -37,16 +37,12 @@ def buscar_en_freund(url_departamento, termino_busqueda):
     resultados = []
     
     try:
-        # Petición HTTP al departamento seleccionado
         respuesta = requests.get(url_departamento, headers=headers, timeout=7)
         if respuesta.status_code == 200:
             soup = BeautifulSoup(respuesta.text, "html.parser")
-            
-            # Buscamos las tarjetas de producto según la estructura común de su plataforma de e-commerce
             tarjetas = soup.find_all("div", class_="product-block") or soup.find_all("div", class_="item") or soup.find_all("div", class_="product-item")
             
             for t in tarjetas:
-                # Intentamos extraer el título y el precio usando clases estándar
                 titulo_elem = t.find("h3") or t.find("a", class_="product-item-link") or t.find("div", class_="name")
                 precio_elem = t.find("span", class_="price") or t.find("div", class_="price")
                 
@@ -59,17 +55,16 @@ def buscar_en_freund(url_departamento, termino_busqueda):
                     except:
                         precio = 0.0
                     
-                    # Filtramos por el término de búsqueda ingresado
                     if not termino_busqueda or termino_busqueda.lower() in nombre.lower():
                         resultados.append({
                             "sku": "F-" + str(len(resultados) + 101),
                             "name": nombre.upper(),
                             "price": precio
                         })
-    except Exception as e:
-        pass # Si falla el scraping en vivo, pasará a usar el respaldo
+    except:
+        pass
         
-    # RESPALDO AUTOMÁTICO INTEGRADO (Si el raspado no arroja datos debido al firewall de la tienda)
+    # RESPALDO AUTOMÁTICO INTEGRADO (Por si el firewall bloquea la IP de Streamlit)
     if not resultados:
         materiales_respaldo = [
             {"sku": "1413211", "name": "TUBO CONDUIT EMT GALVANIZADO 3/4 PLG (6MT)", "price": 4.25, "dep": "🏗️ Tubería y Ductos (Cableado)"},
@@ -82,7 +77,6 @@ def buscar_en_freund(url_departamento, termino_busqueda):
             {"sku": "TOMA-01", "name": "TOMACORRIENTE DOBLE CON TIERRA POLARIZADO EAGLE", "price": 2.85, "dep": "⚡ Material Eléctrico"},
             {"sku": "MALLA-02", "name": "MALLA CICLONICA GALVANIZADA 2X2 PULG (1.50X20MT)", "price": 85.00, "dep": "⛓️ Alambres y Mallas"}
         ]
-        # Filtramos el respaldo local por departamento y por palabra clave
         for m in materiales_respaldo:
             url_seleccionada = DEPARTAMENTOS_FREUND.get(m["dep"])
             if url_seleccionada == url_departamento:
@@ -132,4 +126,165 @@ with tab1:
         
         if btn_eq and desc_eq:
             margen_decimal = rent_inicial / 100.0
-            precio_venta_u = costo_
+            precio_venta_u = costo_eq / (1 - margen_decimal) if margen_decimal < 1 else costo_eq
+            
+            st.session_state["equipos"].append({
+                "Borrar": False,
+                "Descripción": desc_eq,
+                "Cantidad": int(cant_eq),
+                "Costo Unitario ($)": float(costo_eq),
+                "Costo Total ($)": float(costo_eq * cant_eq),
+                "Rentabilidad (%)": float(rent_inicial),
+                "Precio Venta U ($)": float(precio_venta_u),
+                "Precio Venta Total ($)": float(precio_venta_u * cant_eq)
+            })
+            st.success(f"Agregado: {desc_eq}")
+
+    if st.session_state["equipos"]:
+        st.markdown("#### 📊 Lista de Equipos Cargados")
+        df_original = pd.DataFrame(st.session_state["equipos"])
+        
+        df_editado = st.data_editor(
+            df_original,
+            hide_index=True,
+            use_container_width=True,
+            disabled=["Descripción", "Costo Unitario ($)", "Costo Total ($)", "Precio Venta U ($)", "Precio Venta Total ($)"],
+            column_config={
+                "Borrar": st.column_config.CheckboxColumn("Seleccionar para Borrar", default=False),
+                "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99, step=1),
+                "Costo Unitario ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Costo Total ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Precio Venta U ($)": st.column_config.NumberColumn(format="$%.2f"),
+                "Precio Venta Total ($)": st.column_config.NumberColumn(format="$%.2f"),
+            }
+        )
+        
+        for i in range(len(df_editado)):
+            r_pct = df_editado.at[i, "Rentabilidad (%)"] / 100.0
+            c_uni = df_editado.at[i, "Costo Unitario ($)"]
+            cant = df_editado.at[i, "Cantidad"]
+            
+            df_editado.at[i, "Costo Total ($)"] = c_uni * cant
+            p_venta_u = c_uni / (1 - r_pct) if r_pct < 1 else c_uni
+            df_editado.at[i, "Precio Venta U ($)"] = p_venta_u
+            df_editado.at[i, "Precio Venta Total ($)"] = p_venta_u * cant
+
+        st.session_state["equipos"] = df_editado.to_dict(orient="records")
+        
+        total_costo_interno_eq = sum(x["Costo Total ($)"] for x in st.session_state["equipos"])
+        total_venta_eq = sum(x["Precio Venta Total ($)"] for x in st.session_state["equipos"])
+        
+        st.markdown(" ")
+        ceq1, ceq2 = st.columns(2)
+        ceq1.metric("Costo Interno Total (Equipos)", f"${total_costo_interno_eq:,.2f}")
+        ceq2.metric("Precio de Venta Total (Equipos)", f"${total_venta_eq:,.2f}")
+        
+        st.markdown("---")
+        col_btn1, col_btn2 = st.columns([3, 10])
+        
+        if col_btn1.button("🗑️ Aplicar Eliminación de Marcados", key="del_eq"):
+            st.session_state["equipos"] = [eq for eq in st.session_state["equipos"] if not eq["Borrar"]]
+            st.success("Equipos eliminados correctamente.")
+            st.rerun()
+                
+        if col_btn2.button("Limpiar Toda la Lista", key="btn_clear_eq"):
+            st.session_state["equipos"] = []
+            st.rerun()
+
+# ==========================================
+# --- PESTAÑA 2: BUSCADOR FREUND ---
+# ==========================================
+with tab2:
+    st.subheader("🔍 Extractor de Catálogo en Vivo — Ferretería Freund El Salvador")
+    st.caption("Selecciona un departamento de canalización o materiales eléctricos para realizar la búsqueda dirigida.")
+    
+    col_dep, col_text = st.columns([2, 3])
+    dept_seleccionado = col_dep.selectbox("Seleccionar Departamento Técnico", list(DEPARTAMENTOS_FREUND.keys()))
+    buscar_termino = col_text.text_input("¿Qué material o palabra clave buscas? (O déjalo vacío para ver todo)", placeholder="Ej. tuberia emt, union, cable...")
+    
+    url_final = DEPARTAMENTOS_FREUND[dept_seleccionado]
+    
+    if st.button("🚀 Buscar Insumos en Freund"):
+        with st.spinner("Conectando con el servidor de Freund..."):
+            coincidencias = buscar_en_freund(url_final, buscar_termino)
+            
+            if coincidencias:
+                st.markdown(f"#### 📊 Materiales encontrados en el pasillo ({len(coincidencias)})")
+                for i, m in enumerate(coincidencias):
+                    with st.container():
+                        c_card1, c_card2, c_card3 = st.columns([4, 1, 2])
+                        c_card1.markdown(f"**{m['name']}** \n`SKU: {m['sku']}`")
+                        c_card2.markdown(f"#### ${m['price']:.2f}")
+                        cant_m = c_card3.number_input("Cant.", min_value=1, value=1, step=1, key=f"f_cant_{i}")
+                        
+                        if c_card3.button("📥 Agregar al Costeo", key=f"f_btn_{i}"):
+                            p_v = m['price'] / (1 - 0.40)
+                            st.session_state["materiales"].append({
+                                "Borrar": False,
+                                "Descripción": m['name'],
+                                "Cantidad": int(cant_m),
+                                "Costo Unitario ($)": float(m['price']),
+                                "Costo Total ($)": float(m['price'] * cant_m),
+                                "Rentabilidad (%)": 40.0,
+                                "Precio Venta U ($)": float(p_v),
+                                "Precio Venta Total ($)": float(p_v * cant_m)
+                            })
+                            st.toast(f"Agregado: {m['name']}")
+                        st.markdown("---")
+            else:
+                st.warning("No se encontraron coincidencias para esa palabra clave en este departamento.")
+
+    if st.session_state["materiales"]:
+        st.markdown("### 🛒 Materiales y Suministros Cargados en esta Cotización")
+        df_mat_orig = pd.DataFrame(st.session_state["materiales"])
+        df_mat_edit = st.data_editor(
+            df_mat_orig,
+            hide_index=True,
+            use_container_width=True,
+            disabled=["Descripción", "Costo Unitario ($)", "Costo Total ($)", "Precio Venta U ($)", "Precio Venta Total ($)"],
+            column_config={
+                "Borrar": st.column_config.CheckboxColumn("Borrar", default=False),
+                "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                "Rentabilidad (%)": st.column_config.NumberColumn("Rentabilidad (%)", min_value=0, max_value=99, step=1),
+            }
+        )
+        for i in range(len(df_mat_edit)):
+            r_pct = df_mat_edit.at[i, "Rentabilidad (%)"] / 100.0
+            c_uni = df_mat_edit.at[i, "Costo Unitario ($)"]
+            cant = df_mat_edit.at[i, "Cantidad"]
+            
+            df_mat_edit.at[i, "Costo Total ($)"] = c_uni * cant
+            p_venta_u = c_uni / (1 - r_pct) if r_pct < 1 else c_uni
+            df_mat_edit.at[i, "Precio Venta U ($)"] = p_venta_u
+            df_mat_edit.at[i, "Precio Venta Total ($)"] = p_venta_u * cant
+            
+        st.session_state["materiales"] = df_mat_edit.to_dict(orient="records")
+        
+        if st.button("🗑️ Eliminar Materiales Seleccionados", key="del_mat"):
+            st.session_state["materiales"] = [m for m in st.session_state["materiales"] if not m["Borrar"]]
+            st.rerun()
+
+# ==========================================
+# --- PESTAÑA 3: MANO DE OBRA ---
+# ==========================================
+with tab3:
+    st.subheader("🛠️ Presupuesto de Mano de Obra, Viáticos y Herramientas")
+    col_izq, col_der = st.columns([1, 1])
+
+    with col_izq:
+        st.markdown("#### ⚙️ 1. Personal Técnico y Logística")
+        rent_mo = st.number_input("Rentabilidad Comercial por Defecto (%)", min_value=0.0, max_value=99.0, value=20.0, step=5.0, key="rent_mo_p3")
+
+        with st.form("form_mano_obra_completo"):
+            st.markdown("**Carga de Personal:**")
+            c1, c2 = st.columns(2)
+            cant_conf = c1.number_input("Cantidad Configuradores", min_value=0, value=0)
+            dias_conf = c2.number_input("Días Configurador", min_value=0, value=0)
+            tarifa_conf = st.number_input("Costo Diario Configurador ($)", min_value=0.0, value=50.0)
+            
+            st.markdown("---")
+            c3, c4 = st.columns(2)
+            cant_inst = c3.number_input("Cantidad Instaladores", min_value=0, value=0)
+            dias_inst = c4.number_input("Días Instalador", min_value=0, value=0)
+            tarifa
